@@ -15,7 +15,7 @@ typedef struct {
 
 int watchDirectory( char* directory);
 
-int readConfigFile( char* filename );
+char *readConfigFile(char *filename);
 
 int fileAdded(char* filename);
 
@@ -23,6 +23,6 @@ int fileModified(char* filename);
 
 int fileDeleted(char* filename);
 
-FileInfo *getAllFilesInfo();
+FileList *getAllFilesInfo();
 
 #endif //DARTSYNC_MONITOR2_H
