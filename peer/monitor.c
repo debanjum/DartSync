@@ -22,9 +22,17 @@ int watchDirectory(char *directory) {
     return -1;
 }
 
-int readConfigFile(char *filename) {
-//TODO
-    return -1;
+char *readConfigFile(char *filename) {
+    char content[999];
+    FILE * file;
+    file = fopen(file , "r");
+    if (file) {
+        while (fscanf(file, "%s", content)!=EOF)
+            printf("%s",content);
+        fclose(file);
+        return content;
+    }
+    return NULL;
 }
 
 int fileAdded(char *filename) {
@@ -38,8 +46,13 @@ int fileModified(char *filename) {
 }
 
 int fileDeleted(char *filename) {
-//    TODO
-    return -1;
+    if (remove(filename) != 0) {
+        perror("Error deleting file");
+        return 0;
+    }
+
+    puts("%s successfully deleted", filename);
+    return 1;
 }
 
 FileList *getAllFilesInfo() {
