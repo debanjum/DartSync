@@ -8,7 +8,7 @@
 
 #ifndef pkt_h
 #define pkt_h
-
+#include "../common/constant.h"
 
 
 #endif /* pkt_h */
