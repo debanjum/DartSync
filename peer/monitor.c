@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <dirent.h>
 
@@ -74,14 +75,25 @@ FileList *getAllFilesInfo() {
     struct dirent *ent;
 
     while ((ent = readdir(dir)) != NULL) {
+        time_t stamp;
+        struct stat statbuf;
+        if (stat(dir, &statbuf) == -1)
+            continue;
+
         FileInfo fileInfo = malloc(sizeof(FileInfo));
 
         fseek(ent, 0L, SEEK_END);
         fileSize = ftell(ent);
 
         fileInfo.size = fileSize;
-//        TODO
-//        fileInfo.lastModifyTime = ;
+        fileInfo.lastModifyTime = statbuf.st_mtime;
+
+        char *fullpath;
+        strcpy(fullpath, dir);
+        sprintf(fullpath, "%s/", ent);
+        char *path = realpath(fullpath, NULL);
+
+        strcpy(fileInfo.filepath, path);
 
         AppendList(fileInfo, fileList);
     }
