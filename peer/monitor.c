@@ -70,7 +70,6 @@ FileList *getAllFilesInfo() {
     if (dir == NULL)
         return NULL;
 
-    int nodeId = 1;
     long fileSize;
     struct dirent *ent;
 
@@ -95,7 +94,7 @@ FileList *getAllFilesInfo() {
 
         strcpy(fileInfo.filepath, path);
 
-        AppendList(fileInfo, fileList);
+        addFileToList(fileInfo, fileList);
     }
 
     return fileList;
