@@ -18,7 +18,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <pthread.h>
-#include "constant.h"
+#include "../common/constant.h"
 
 //each file can be represented as a node in file table
 typedef struct node{
