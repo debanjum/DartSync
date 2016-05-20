@@ -17,8 +17,8 @@ file_t *filetable_create(){
     return ft;
 }
 
-// listen_to_peer thread keeps receiving data requests from other peers. It handles data requests by creating a P2P upload thread.
-// listen_to_peer thread is started after the peer is registered.
+// ptp_listening thread keeps receiving data requests from other peers. It handles data requests by creating a P2P upload thread.
+// ptp_listening thread is started after the peer is registered.
 void* ptp_listening(void* arg){
     int conn;
     socklen_t sin_size;
@@ -31,40 +31,31 @@ void* ptp_listening(void* arg){
             perror("accept error\n");
             exit(1);
         }
-        printf("Listen_to_peer: received a peer request!\n");
+        printf("ptp_listening: received a peer request!\n");
         
+        int *sockfd = (int *)malloc(sizeof(int));
+        *sockfd = conn;
         // create a ptp_upload thread
         pthread_t ptp_upload_thread;
-        pthread_create(&ptp_upload_thread, NULL, ptp_upload, (void*)(client_addr));
-        printf("Listen_to_peer: created ptp_upload thread!\n");
+        pthread_create(&ptp_upload_thread, NULL, ptp_upload, (void*)(sockfd));
+        printf("ptp_listening: created a ptp_upload thread with sockfd = %d!\n", conn);
     }
 }
 
 // ptp_upload thread is started by listen_to_peer thread and responsible for uploading data to remote peer.
 void* ptp_upload(void* arg){
-    struct sockaddr_in * peer_addr = (struct sockaddr_in *) arg;
-    
-    int sockfd;
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 6)) == -1) {
-        perror("socket creation error\n");
-        exit(1);
-    }
-    
-    struct sockaddr_in server_addr;
-    memset(&server_addr, 0, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(DOWNLOAD_PORT);
-    server_addr.sin_addr = peer_addr->sin_addr;  // IP address of the peer who sent "download" request
-    
-    if ((connect(sockfd, (struct sockaddr *)&(server_addr), sizeof(struct sockaddr))) == -1) {
-        perror("connect error\n");
-        exit(1);
-    }
-    printf("Peer: successfully connect to ptp_download thread of remote peer!\n");
+    //struct sockaddr_in * peer_addr = (struct sockaddr_in *) arg;
+    int sockfd = * ((int *)arg);
+    free(arg);
+
+    printf("Peer: start sending data to ptp_download thread of remote peer!\n");
     
     // send data to remote peer through *sockfd*
     
-    free(peer_addr);
+    
+    
+    close(sockfd);
+    
     // terminate this thread
     pthread_detach(pthread_self());
     pthread_exit(0);
@@ -89,46 +80,14 @@ void* ptp_download(void* arg){
     }
     printf("Peer: successfully connect to ptp_listening thread of remote peer!\n");
     
-    close(sockfd);
     free(peer_addr);
 
-    // start connection with ptp_upload thread of remote peer
-    int listenfd;
-    if ((listenfd = socket(AF_INET, SOCK_STREAM, 6)) == -1) {
-        perror("socket creation error\n");
-        exit(1);
-    }
-    
-    struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;       // host byte order
-    server_addr.sin_port = htons(DOWNLOAD_PORT);
-    server_addr.sin_addr.s_addr = htonl(INADDR_ANY); // automatically fill with my IP address "localhost"
-    memset(&(server_addr.sin_zero), '\0', 8); // zero the rest of the struct
-    
-    if (bind(listenfd, (struct sockaddr *)&server_addr, sizeof(struct sockaddr)) == -1) {
-        perror("bind error\n");
-        exit(1);
-    }
-    
-    if (listen(listenfd, MAX_PEER_NUM) == -1) {
-        perror("listen error\n");
-        exit(1);
-    }
-    
-    int conn;
-    socklen_t sin_size = sizeof(struct sockaddr_in);
-    
-    struct sockaddr_in client_addr;
-    if ((conn = accept(listenfd, (struct sockaddr *)(&client_addr), &sin_size)) == -1) {
-        perror("accept error\n");
-        exit(1);
-    }
-    printf("Peer: successfully connect to ptp_upload thread of remote peer!\n");
-    
-    // receive data from remote peer through *conn*
+    // receive data from remote peer through *sockfd*
     while (1) {
         
     }
+    
+    close(sockfd);
     
     // terminate this thread
     pthread_detach(pthread_self());
@@ -229,7 +188,7 @@ int main(int argc, const char * argv[]) {
     // initialize file table
     file_table = filetable_create();
     
-    // connect to tracker, register and accept state
+    // connect to tracker, register and accept
     tracker_conn = connect_to_tracker();
     printf("Peer: successfully connect to tracker!\n");
     
@@ -244,9 +203,9 @@ int main(int argc, const char * argv[]) {
     pthread_t keep_alive_thread;
     pthread_create(&keep_alive_thread, NULL, keep_alive, (void*)0);
     
-    // (file_monitor_thread) send a HANDSHAKE pkt filled with file table
+    // (file_monitor thread) send a HANDSHAKE pkt filled with file table
     
-    // (main_thread) 1.keep receiving BROADCAST pkt from tracker
+    // (main thread) 1.keep receiving BROADCAST pkt from tracker
     // 2. compare the received file table with local file table
     // 3. create a ptp_download thread for each different file and update peer table
     // 4. (ptp_download thread) send HANDSHAKE pkt to tracker
