@@ -23,12 +23,18 @@ int watchDirectory(char *directory) {
 }
 
 char *readConfigFile(char *filename) {
-    char content[999];
-    FILE * file;
-    file = fopen(file , "r");
+    char *content = 0;
+    long length;
+    FILE *file = fopen(filename, "rb");
+
     if (file) {
-        while (fscanf(file, "%s", content)!=EOF)
-            printf("%s",content);
+        fseek(file, 0, SEEK_END);
+        length = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        content = malloc(length);
+        if (content) {
+            fread(buffer, 1, length, file);
+        }
         fclose(file);
         return content;
     }
