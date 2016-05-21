@@ -6,32 +6,33 @@ common/list.c,62
 void addFileToList(33,745
 FileInfo *PopList(PopList53,1248
 
-common/constant.h,704
+common/constant.h,740
 #define common_h10,142
 #define PROTOCOL_LEN 22,356
-#define RESERVED_LEN 23,401
-#define IP_LEN 24,426
-#define FILE_NAME_LEN 25,444
-#define REGISTER 27,471
-#define KEEP_ALIVE 28,490
-#define FILE_UPDATE 29,511
-#define ACCEPT 30,533
-#define MAX_PEER_NUM 32,551
-#define HANDSHAKE_PORT 34,575
-#define P2P_PORT 35,603
-#define HEARTBEAT_INTERVAL 37,626
-#define TRACKER_IP 39,657
-#define WATCHING 40,703
-typedef struct node{node43,782
-    long size;45,830
-    char *name;name47,872
-    unsigned long int timestamp;49,945
-    struct node *pNext;pNext51,1017
-    char *newpeerip;newpeerip55,1224
-} Node;56,1245
-typedef struct file_table 59,1293
-    Node * head;60,1321
-} file_t;61,1338
+#define RESERVED_LEN 23,403
+#define IP_LEN 24,428
+#define FILE_NAME_LEN 25,446
+#define REGISTER 27,473
+#define KEEP_ALIVE 28,492
+#define FILE_UPDATE 29,513
+#define ACCEPT 30,535
+#define MAX_PEER_NUM 32,553
+#define HANDSHAKE_PORT 34,577
+#define P2P_PORT 35,605
+#define HEARTBEAT_INTERVAL 37,628
+#define HEARTBEAT_TIMEOUT 38,690
+#define TRACKER_IP 40,798
+#define WATCHING 41,844
+typedef struct node{node44,923
+    long size;46,971
+    char *name;name48,1013
+    unsigned long int timestamp;50,1086
+    struct node *pNext;pNext52,1158
+    char *newpeerip;newpeerip56,1365
+} Node;57,1386
+typedef struct file_table 60,1434
+    Node * head;61,1462
+} file_t;62,1479
 
 common/pkt.c,111
 int peer_sendpkt(29,553
@@ -54,14 +55,15 @@ typedef struct segment_tracker{segment_tracker31,827
     file_t  file_table;35,985
 } ptp_tracker_t;36,1009
 
-tracker/tracker.c,178
+tracker/tracker.c,212
 tracker_peer_t *peer_head peer_head21,385
 file_t *ft ft22,433
-void* handshake(24,483
-void* heartbeat(34,763
-int add_peer(39,844
-int delete_peer(65,1769
-int main(75,2049
+void* handshake(25,547
+void* heartbeat(40,1031
+int update_filetable(55,1551
+int add_peer(91,3085
+int delete_peer(121,4127
+int main(133,4409
 
 tracker/tracker.h,206
 typedef struct tracker_side_peer_t 11,206

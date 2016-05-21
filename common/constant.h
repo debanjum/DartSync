@@ -19,7 +19,7 @@
 #include <netinet/in.h>
 #include <pthread.h>
 
-#define PROTOCOL_LEN 100    // protocol name
+#define PROTOCOL_LEN 100      // protocol name
 #define RESERVED_LEN 512
 #define IP_LEN 16
 #define FILE_NAME_LEN 256
@@ -34,7 +34,8 @@
 #define HANDSHAKE_PORT 3078
 #define P2P_PORT 3578
 
-#define HEARTBEAT_INTERVAL 60
+#define HEARTBEAT_INTERVAL 60   // Heartbeat Message Interval
+#define HEARTBEAT_TIMEOUT 240   // Peer dead if Tracker doesn't hear its heartbeat not heard for this long
 
 #define TRACKER_IP "127.0.0.1"  // Tracker IP
 #define WATCHING "./"

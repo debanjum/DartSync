@@ -19,5 +19,17 @@ typedef struct tracker_side_peer_t {
     struct tracker_side_peer_t *next;
 } tracker_peer_t;
 
+//delete peer with given peer socket file descriptor(peer_sockfd)
+int delete_peer(int peer_sockfd);
 
+// add peer to tracker_peer_t list
+int add_peer(int peer_sockfd, char ip[IP_LEN]);
 
+// update tracker filetable based on information from peer's filetable
+int update_filetable(file_t *peer_ft);
+
+// heartbeat thread continuously checks (every HEARTBEAT_INTERVAL) and remove peers not heard from in a while(= HEARTBEAT_TIMEOUT)
+void* heartbeat(void* arg);
+
+// main thread for handling communication with individual peers
+void* handshake(void* arg);
