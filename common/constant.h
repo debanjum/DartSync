@@ -37,6 +37,7 @@
 #define HEARTBEAT_INTERVAL 60
 
 #define TRACKER_IP "127.0.0.1"  // Tracker IP
+#define WATCHING "./"
 
 // each file can be represented as a node in file table
 typedef struct node{
@@ -78,6 +79,5 @@ typedef struct segment_peer {
     // file table of the client -- your own design
     file_t file_table;
 } ptp_peer_t;
-
 
 #endif /* common_h */
