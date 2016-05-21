@@ -13,8 +13,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "common/constant.h"
-#include "common/list.h"
+#include "../common/constant.h"
+#include "../common/list.h"
 #include "monitor.h"
 
 

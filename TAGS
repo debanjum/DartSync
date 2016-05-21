@@ -1,0 +1,118 @@
+
+common/list.h,30
+#define DARTSYNC_UTILS_H7,94
+
+common/list.c,62
+void addFileToList(33,745
+FileInfo *PopList(PopList53,1248
+
+common/constant.h,704
+#define common_h10,142
+#define PROTOCOL_LEN 22,356
+#define RESERVED_LEN 23,401
+#define IP_LEN 24,426
+#define FILE_NAME_LEN 25,444
+#define REGISTER 27,471
+#define KEEP_ALIVE 28,490
+#define FILE_UPDATE 29,511
+#define ACCEPT 30,533
+#define MAX_PEER_NUM 32,551
+#define HANDSHAKE_PORT 34,575
+#define P2P_PORT 35,603
+#define HEARTBEAT_INTERVAL 37,626
+#define TRACKER_IP 39,657
+#define WATCHING 40,703
+typedef struct node{node43,782
+    long size;45,830
+    char *name;name47,872
+    unsigned long int timestamp;49,945
+    struct node *pNext;pNext51,1017
+    char *newpeerip;newpeerip55,1224
+} Node;56,1245
+typedef struct file_table 59,1293
+    Node * head;60,1321
+} file_t;61,1338
+
+common/pkt.c,111
+int peer_sendpkt(29,553
+int peer_recvpkt(64,1434
+int tracker_sendpkt(125,2437
+int tracker_recvpkt(156,3165
+
+common/pkt.h,393
+#define pkt_h10,136
+typedef struct segment_peer 14,241
+    int type;16,332
+    char reserved[reserved18,435
+    char peer_ip[peer_ip20,515
+    int port;22,577
+    int file_table_size;24,654
+    file_t file_table;26,730
+} ptp_peer_t;27,753
+typedef struct segment_tracker{segment_tracker31,827
+    int file_table_size;33,908
+    file_t  file_table;35,985
+} ptp_tracker_t;36,1009
+
+tracker/tracker.c,178
+tracker_peer_t *peer_head peer_head21,385
+file_t *ft ft22,433
+void* handshake(24,483
+void* heartbeat(34,763
+int add_peer(39,844
+int delete_peer(65,1769
+int main(75,2049
+
+tracker/tracker.h,206
+typedef struct tracker_side_peer_t 11,206
+    char ip[ip13,283
+    unsigned long last_time_stamp;15,345
+    int sockfd;17,422
+    struct tracker_side_peer_t *next;next19,483
+} tracker_peer_t;20,521
+
+peer/monitor.c,193
+int watchDirectory(21,308
+char *readConfigFile(readConfigFile26,375
+int fileAdded(45,792
+int fileModified(50,853
+int fileDeleted(55,917
+FileList *getAllFilesInfo(getAllFilesInfo65,1112
+
+peer/peer.h,258
+#define peer_h10,138
+typedef struct _peer_side_peer_t 16,241
+    char ip[ip18,317
+    char file_name[file_name20,375
+    unsigned long file_time_stamp;22,455
+    int sockfd;24,532
+    struct _peer_side_peer_t *next;next26,593
+} peer_peer_t;27,629
+
+peer/.monitor2.c,66
+#define EVENT_SIZE 8,139
+#define BUF_LEN 9,193
+int main(11,245
+
+peer/monitor.h,145
+#define DARTSYNC_MONITOR2_H8,108
+    char filepath[filepath11,154
+    long size;12,195
+    time_t  lastModifyTime;13,230
+} FileInfo;14,293
+
+peer/peer.c,432
+int ptp_listen_fd,11,142
+int ptp_listen_fd, tracker_conn;11,142
+file_t *file_table;file_table12,175
+file_t *filetable_create(filetable_create15,246
+void* ptp_listening(22,538
+void* ptp_upload(46,1461
+void* ptp_download(66,2099
+void* file_monitor(99,3095
+void* keep_alive(104,3209
+void ptp_listen_thread_init(115,3370
+void ft_destroy(144,4391
+void peer_stop(148,4418
+int connect_to_tracker(155,4608
+int main(182,5314

@@ -1,7 +1,7 @@
 //
 // Created by Amir on 5/19/2016.
 //
-#include "../monitor.h"
+#include "../peer/monitor.h"
 
 #ifndef DARTSYNC_UTILS_H
 #define DARTSYNC_UTILS_H
