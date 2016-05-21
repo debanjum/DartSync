@@ -53,7 +53,7 @@ typedef struct node{
     //for the file table on peers, it is the ip address of the peer
     //for the file table on tracker, it records the ip of all peers which has the
     //newest edition of the file
-    char *newpeerip;
+    char newpeerip[MAX_PEER_NUM][IP_LEN+1];
 } Node;
 
 // file table is a linked list of Node

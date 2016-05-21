@@ -30,7 +30,8 @@ void* handshake(void* arg) {
 	if(recv_pkt->type==REGISTER)
 	    tracker_sendpkt(connection, ft);
 	else if(recv_pkt->type==FILE_UPDATE) {
-	    update_filetable(&recv_pkt->file_table);
+	    update_filetable(&recv_pkt->file_table);  // update tracker file_table based on information from peer's file_table
+	    broadcast_filetable();                    // send updated tracker file_table to all peers
 	}
     }
     return 0;
@@ -51,6 +52,18 @@ void* heartbeat(void* arg) {
     }
 }
 
+// send tracker filetable to all peer's in peers_list
+int broadcast_filetable() {
+    tracker_peer_t* temp;
+    
+    //search through peers linked_list for peer with peer_sockfd and delete it
+    for( temp = peer_head; temp != NULL; temp = temp->next )
+	tracker_sendpkt(temp->sockfd, ft);
+    
+    return 1;
+}
+
+
 // update tracker filetable based on information from peer's filetable
 int update_filetable(file_t *peer_ft) {
     Node *peer_ftemp, *tracker_ftemp;
@@ -63,11 +76,18 @@ int update_filetable(file_t *peer_ft) {
 	for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
 	    // if found matchine file entry between tracker and peer
 	    if (strcmp(tracker_ftemp->name, peer_ftemp->name)==0) {
-		// UPDATE_FILEMETA: if matching file entry in tracker older than on peer, update tracker file_table entry
+		// UPDATE_FILE_PEERS: if matching file entry in tracker older than on peer, update tracker file_table entry
+		if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
+		    int peers = sizeof(tracker_ftemp->newpeerip)/IP_LEN;                // find no. of peers in 'newpeerip' string array
+		    strcpy(tracker_ftemp->newpeerip[peers], peer_ftemp->newpeerip[0]);  // append new peer to 'newpeerip' end of string array 
+		    found = 1;
+		    break;
+		}
+		// UPDATE_FILE_VERSION : if matching file entry in tracker older than on peer, update tracker file_table entry
 		if(tracker_ftemp->timestamp < peer_ftemp->timestamp) {
 		    tracker_ftemp->size = peer_ftemp->size;
 		    tracker_ftemp->timestamp = peer_ftemp->timestamp;
-		    memcpy(tracker_ftemp->newpeerip, peer_ftemp->newpeerip, IP_LEN);
+		    strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
 		    found = 1;
 		    break;
 		}
@@ -76,10 +96,21 @@ int update_filetable(file_t *peer_ft) {
 	    if (tracker_ftemp->pNext == NULL)
 		break;
 	}
-	// APPEND FILEMETA: if no file with current file_name on peer found on tracker's file table, append the file to tracker's file table
+	
+	// ADD_FILE: if no file with current file_name on peer found on tracker's file table, append the file to tracker's file table
 	if(!found) {
+	    //if file_list not empty, head!=NULL case
+	    if(tracker_ftemp) {
+		tracker_ftemp->pNext  = calloc(1, sizeof(Node));
+		tracker_ftemp        = tracker_ftemp->pNext;
+	    }
+	    //catches case of empty list, head==NULL case
+	    else
+		tracker_ftemp        = calloc(1, sizeof(Node));
+	    
+	    // add file meta data
 	    strcpy(tracker_ftemp->name, peer_ftemp->name);
-	    memcpy(tracker_ftemp->newpeerip, peer_ftemp->newpeerip, IP_LEN);
+	    strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
 	    tracker_ftemp->size      = peer_ftemp->size;
 	    tracker_ftemp->timestamp = peer_ftemp->timestamp;
 	}

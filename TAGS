@@ -6,7 +6,7 @@ common/list.c,62
 void addFileToList(33,745
 FileInfo *PopList(PopList53,1248
 
-common/constant.h,740
+common/constant.h,739
 #define common_h10,142
 #define PROTOCOL_LEN 22,356
 #define RESERVED_LEN 23,403
@@ -28,11 +28,11 @@ typedef struct node{node44,923
     char *name;name48,1013
     unsigned long int timestamp;50,1086
     struct node *pNext;pNext52,1158
-    char *newpeerip;newpeerip56,1365
-} Node;57,1386
-typedef struct file_table 60,1434
-    Node * head;61,1462
-} file_t;62,1479
+    char newpeerip[newpeerip56,1365
+} Node;57,1409
+typedef struct file_table 60,1457
+    Node * head;61,1485
+} file_t;62,1502
 
 common/pkt.c,111
 int peer_sendpkt(29,553
@@ -55,15 +55,16 @@ typedef struct segment_tracker{segment_tracker31,827
     file_t  file_table;35,985
 } ptp_tracker_t;36,1009
 
-tracker/tracker.c,212
+tracker/tracker.c,246
 tracker_peer_t *peer_head peer_head21,385
 file_t *ft ft22,433
 void* handshake(25,547
-void* heartbeat(40,1031
-int update_filetable(55,1551
-int add_peer(91,3085
-int delete_peer(121,4127
-int main(133,4409
+void* heartbeat(41,1200
+int broadcast_filetable(56,1703
+int update_filetable(68,2032
+int add_peer(122,4337
+int delete_peer(152,5379
+int main(164,5661
 
 tracker/tracker.h,206
 typedef struct tracker_side_peer_t 11,206

@@ -28,6 +28,9 @@ int add_peer(int peer_sockfd, char ip[IP_LEN]);
 // update tracker filetable based on information from peer's filetable
 int update_filetable(file_t *peer_ft);
 
+// send tracker filetable to all peer's in peers_list
+int broadcast_filetable();
+
 // heartbeat thread continuously checks (every HEARTBEAT_INTERVAL) and remove peers not heard from in a while(= HEARTBEAT_TIMEOUT)
 void* heartbeat(void* arg);
 
