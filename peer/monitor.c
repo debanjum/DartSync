@@ -17,6 +17,7 @@
 #include "../common/list.h"
 #include "monitor.h"
 
+char *DIR_PATH;
 
 int watchDirectory(char *directory) {
 //    TODO
@@ -32,9 +33,9 @@ char *readConfigFile(char *filename) {
         fseek(file, 0, SEEK_END);
         length = ftell(file);
         fseek(file, 0, SEEK_SET);
-        content = malloc(length);
+        content = malloc((size_t) length);
         if (content) {
-            fread(buffer, 1, length, file);
+            fread(content, 1, (size_t) length, file);
         }
         fclose(file);
         return content;
@@ -62,40 +63,60 @@ int fileDeleted(char *filename) {
     return 1;
 }
 
-FileList *getAllFilesInfo() {
-    FileList *fileList = malloc(sizeof(FileList));
-    DIR *dir;
-
-    dir = opendir(DIR_PATH);
-    if (dir == NULL)
+FileInfo *getFileInfo(char *filename) {
+    if (filename == NULL || strlen(filename) == 0 || DIR_PATH == NULL || strlen(DIR_PATH) == 0)
         return NULL;
 
-    long fileSize;
-    struct dirent *ent;
+    char *absolutePath = malloc(sizeof(filename) + 50);
+    strcpy(absolutePath, DIR_PATH);
+    size_t folderLen = strlen(absolutePath);
+    if (absolutePath[folderLen - 1] != '/')
+        strcat(absolutePath, "/");
 
-    while ((ent = readdir(dir)) != NULL) {
-        time_t stamp;
-        struct stat statbuf;
-        if (stat(dir, &statbuf) == -1)
-            continue;
+    sprintf(absolutePath, "%s%s", absolutePath, filename);
 
-        FileInfo fileInfo = malloc(sizeof(FileInfo));
+    FileInfo *fileInfo = NULL;
 
-        fseek(ent, 0L, SEEK_END);
-        fileSize = ftell(ent);
+    struct stat statbuf;
+    if (stat(absolutePath, &statbuf) != -1) {
+        fileInfo = malloc(sizeof(FileInfo));
+        long fileSize = statbuf.st_size;
 
-        fileInfo.size = fileSize;
-        fileInfo.lastModifyTime = statbuf.st_mtime;
+        fileInfo->size = fileSize;
+        fileInfo->lastModifyTime = statbuf.st_mtime;
 
-        char *fullpath;
-        strcpy(fullpath, dir);
-        sprintf(fullpath, "%s/", ent);
-        char *path = realpath(fullpath, NULL);
-
-        strcpy(fileInfo.filepath, path);
-
-        addFileToList(fileInfo, fileList);
+        strcpy(fileInfo->filepath, absolutePath);
     }
 
-    return fileList;
+    free(absolutePath);
+    return fileInfo;
+}
+
+FileInfo *getFileInfo(char *filename) {
+    if (filename == NULL || strlen(filename) == 0 || DIR_PATH == NULL || strlen(DIR_PATH) == 0)
+        return NULL;
+
+    char *absolutePath = malloc(sizeof(filename) + 50);
+    strcpy(absolutePath, DIR_PATH);
+    size_t folderLen = strlen(absolutePath);
+    if (absolutePath[folderLen - 1] != '/')
+        strcat(absolutePath, "/");
+
+    sprintf(absolutePath, "%s%s", absolutePath, filename);
+
+    FileInfo *fileInfo = NULL;
+
+    struct stat statbuf;
+    if (stat(absolutePath, &statbuf) != -1) {
+        fileInfo = malloc(sizeof(FileInfo));
+        long fileSize = statbuf.st_size;
+
+        fileInfo->size = fileSize;
+        fileInfo->lastModifyTime = statbuf.st_mtime;
+
+        strcpy(fileInfo->filepath, absolutePath);
+    }
+
+    free(absolutePath);
+    return fileInfo;
 }
