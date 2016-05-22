@@ -59,12 +59,12 @@ tracker/tracker.c,246
 tracker_peer_t *peer_head peer_head21,385
 file_t *ft ft22,433
 void* handshake(25,547
-void* heartbeat(41,1200
-int broadcast_filetable(56,1703
-int update_filetable(68,2032
-int add_peer(122,4337
-int delete_peer(152,5379
-int main(164,5661
+void* heartbeat(42,1276
+int broadcast_filetable(58,1793
+int update_filetable(68,2112
+int add_peer(131,4829
+int delete_peer(161,5870
+int main(172,6147
 
 tracker/tracker.h,206
 typedef struct tracker_side_peer_t 11,206
