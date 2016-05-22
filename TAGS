@@ -62,9 +62,9 @@ void* handshake(25,547
 void* heartbeat(41,1200
 int broadcast_filetable(56,1703
 int update_filetable(68,2032
-int add_peer(122,4337
-int delete_peer(152,5379
-int main(164,5661
+int add_peer(131,4748
+int delete_peer(161,5790
+int main(173,6072
 
 tracker/tracker.h,206
 typedef struct tracker_side_peer_t 11,206
