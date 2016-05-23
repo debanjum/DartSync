@@ -9,7 +9,6 @@
 #ifndef peer_h
 #define peer_h
 
-#include "../common/constant.h"
 #include "../common/pkt.h"
 
 /* Peer-side peer table */

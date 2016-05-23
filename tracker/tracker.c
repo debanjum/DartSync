@@ -3,18 +3,7 @@
 //  tracker
 //
 //  Created by Debanjum Singh Solanky on 05/20/16.
-//  Copyright Â© 2016 Debanjum Singh Solanky. All rights reserved.
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <assert.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <time.h>
+//  Copyright © 2016 Debanjum Singh Solanky. All rights reserved.
 
 #include "tracker.h"
 
@@ -41,6 +30,7 @@ void* handshake(void* arg) {
 // continuously check (every HEARTBEAT_INTERVAL) and remove peers not heard from in a while (= HEARTBEAT_TIMEOUT)
 void* heartbeat(void* arg) {
     tracker_peer_t* temp;
+    printf("heartbeat thread started\n");
     
     while(1) {
 	//traverse through peers linked_list for peer

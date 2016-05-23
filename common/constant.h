@@ -17,6 +17,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <signal.h>
 #include <pthread.h>
 
 #define PROTOCOL_LEN 100      // protocol name
