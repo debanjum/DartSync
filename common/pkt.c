@@ -233,7 +233,7 @@ int ptp_sendpkt(int conn, ptp_data_pkt_t *pkt){
         free(pkt);
         return -1;
     }
-    printf("~> sent data pkt to peer ip = %s\n", pkt->dest_ip);
+    printf("~> sent data pkt to peer\n");
     free(pkt);
     return 1;
 }

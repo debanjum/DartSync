@@ -37,28 +37,46 @@ typedef struct segment_tracker{
 
 // The packet data structure sending from peer to peer
 typedef struct segment_ptp{
-    char dest_ip[IP_LEN];
-    char file_path[FILE_NAME_LEN];
+    char filename[FILE_NAME_LEN];
     int pieceNum;
-    int totalNum;
     // size of file Data
     unsigned long size;
     // fiel data contained in this pkt
     char data[MAX_DATA_LEN];
 } ptp_data_pkt_t;
 
+// structure of data request sent from remote peer
+typedef struct data_request_ptp{
+    char filename[FILE_NAME_LEN];
+    unsigned long offset; // file offset
+    unsigned long size; // piece size
+    int pieceNum;
+} ptp_request_t;
+
 // data structure of the arguments parsed from ptp_listening thread to ptp_upload thread
 typedef struct upload_arg_ptp{
     int sockfd;
     char file_path[FILE_NAME_LEN];
     int pieceNum;
+    unsigned long offset; // file offset
+    unsigned long size; // piece size
 } upload_arg_t;
 
-// structure of data request sent from remote peer
-typedef struct data_request_ptp{
+// data structure of the arguments parsed from main thread to ptp_download thread
+typedef struct download_arg_ptp{
     char filename[FILE_NAME_LEN];
+    unsigned long size;   // file size
+    int peerNum; // num of available peers
+    struct sockaddr_in addr_list[MAX_PEER_NUM];
+} download_arg_t;
+
+typedef struct piece_download_arg_ptp{
+    char filename[FILE_NAME_LEN];
+    unsigned long offset; // file offset
+    unsigned long size; // piece size
     int pieceNum;
-} ptp_request_t;
+    struct sockaddr_in peer_addr;
+} piece_download_arg_t;
 
 // Tracker receives packet from peer
 int tracker_recvpkt(int connection, ptp_peer_t *pkt);

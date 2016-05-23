@@ -18,7 +18,7 @@ file_t *filetable_create(){
 }
 
 // ptp_listening thread: parse data request from remote peer
-int recv_data_request(int conn, char* filename, int* pieceNum){
+int recv_data_request(int conn, char* filename, int* pieceNum, unsigned long* offset, unsigned long* size){
     ptp_request_t request_pkt;
     char buf[sizeof(ptp_request_t)+2];
     char c;
@@ -61,6 +61,8 @@ int recv_data_request(int conn, char* filename, int* pieceNum){
                 memmove(&request_pkt, buf, sizeof(ptp_request_t));
                 strcpy(filename, request_pkt.filename);
                 *pieceNum = request_pkt.pieceNum;
+                *offset = request_pkt.offset;
+                *size = request_pkt.size;
                 return 1;
             }
             else if(c=='!') {
@@ -77,27 +79,47 @@ int recv_data_request(int conn, char* filename, int* pieceNum){
     return -1;
 }
 
-// ptp_upload thread: peer wraps file data and send it to remote peer
-int upload_send(int conn, char * file_path, int pieceNum){
+// ptp_upload thread: peer wraps file data and send them to remote peer
+int upload_send(int conn, char* file_path, int pieceNum, unsigned long offset, unsigned long size){
     FILE *fp;
     if ((fp = fopen(file_path, "r")) == NULL){
         printf("Cannot find %s!\n", file_path);
         return -1;
     }
+
+    int fileLen = (int)size;
+    printf("ptp_upload: sending a piece of file [%s], fileLen = %d\n", file_path, fileLen);
     
-    ptp_data_pkt_t *pkt = (ptp_data_pkt_t *)malloc(sizeof(ptp_data_pkt_t));
-    memset(pkt, 0, sizeof(ptp_data_pkt_t));
-    fseek(fp, pieceNum * sizeof(char) * MAX_DATA_LEN, SEEK_SET); // pieceNum starts from 0, 1, 2...
-    fread(pkt->data, sizeof(char), MAX_DATA_LEN, fp);
+    char *buffer = (char *)malloc(fileLen);
+    fseek(fp, offset, SEEK_SET);
+    fread(buffer, fileLen, 1, fp);
+    fclose(fp);
     
-    pkt->pieceNum = pieceNum;
-    pkt->size = strlen(pkt->data);
-    
-    if (ptp_sendpkt(conn, pkt) < 0){
-        return -1;
+    // cut data into several packets if data is too large
+    int pkt_count = fileLen / MAX_DATA_LEN;
+    int remainder_len = fileLen % MAX_DATA_LEN;
+    if (remainder_len > 0){
+        pkt_count++;
     }
     
-    fclose(fp);
+    // send data packet one by one
+    for (int i = 0; i < pkt_count; i++){
+        ptp_data_pkt_t *pkt = (ptp_data_pkt_t *)malloc(sizeof(ptp_data_pkt_t));
+        memset(pkt, 0, sizeof(ptp_data_pkt_t));
+        char *dataPtr = buffer;
+        int length = (remainder_len > 0 && i == pkt_count - 1)? remainder_len : MAX_DATA_LEN;
+        memmove(pkt->data, &dataPtr[i * MAX_DATA_LEN], length);
+        
+        // filename? timestamp?
+        pkt->pieceNum = pieceNum;
+        pkt->size = strlen(pkt->data);
+        
+        if (ptp_sendpkt(conn, pkt) < 0){
+            return -1;
+        }
+    }
+    
+    free(buffer);
     return 1;
 }
 
@@ -143,15 +165,11 @@ void* ptp_listening(void* arg){
         }
         printf("ptp_listening: received a peer request!\n");
         
-        // receive a data request pkt from remote peer
+        // receive a data request pkt from remote peer and parse the request info
         char filename[FILE_NAME_LEN];
-        int pieceNum;
-        recv_data_request(conn, filename, &pieceNum);
-        
-        // parse the request info
         upload_arg_t *arg = (upload_arg_t *)malloc(sizeof(upload_arg_t));
         arg->sockfd = conn;
-        arg->pieceNum = pieceNum;
+        recv_data_request(conn, filename, &arg->pieceNum, &arg->offset, &arg->size);
         
         // change filename into file path
         char file_path[FILE_NAME_LEN];
@@ -173,10 +191,11 @@ void* ptp_upload(void* arg){
     int sockfd =  upload_arg -> sockfd;
     char *file_path = upload_arg -> file_path;
     int pieceNum = upload_arg -> pieceNum;
-
+    unsigned long offset = upload_arg->offset;
+    unsigned long size = upload_arg->size;
     // send data to remote peer through *sockfd*
-    upload_send(sockfd, file_path, pieceNum);
-    printf("Peer_upload: sent data pkt to remote peer!\n");
+    upload_send(sockfd, file_path, pieceNum, offset, size);
+    printf("Peer_upload: successfully sent a piece of file to remote peer!\n");
     
     close(sockfd);
     free(arg);
@@ -186,10 +205,11 @@ void* ptp_upload(void* arg){
     pthread_exit(0);
 }
 
-// ptp_download thread is responsible for downloading data from remote peer.
-// ptp_download thread is started after peer received a BROADCAST pkt and found difference between its local file table with the broadcasted file table.
-void* ptp_download(void* arg){
-    struct sockaddr_in * peer_addr = (struct sockaddr_in *) arg;
+// piece_download thread is for downloading one piece of file from a remote peer
+void* piece_download(void* arg){
+    piece_download_arg_t *piece_arg = (piece_download_arg_t *)arg;
+    char filename[FILE_NAME_LEN];
+    strcpy(filename, piece_arg->filename);
     
     // start connection with ptp_listening thread of remote peer
     int sockfd;
@@ -198,27 +218,126 @@ void* ptp_download(void* arg){
         exit(1);
     }
     
-    peer_addr->sin_port = htons(P2P_PORT);    // ptp_listening port
-    if ((connect(sockfd, (struct sockaddr *)&(peer_addr), sizeof(struct sockaddr))) == -1) {
+    struct sockaddr_in peer_addr;
+    memmove(&peer_addr, &piece_arg->peer_addr, sizeof(struct sockaddr_in));
+    peer_addr.sin_port = htons(P2P_PORT);  // ptp_listening port
+    
+    if ((connect(sockfd, (struct sockaddr *)&peer_addr, sizeof(struct sockaddr))) == -1) {
         perror("connect error\n");
         exit(1);
     }
-    printf("Peer: successfully connect to ptp_listening thread of remote peer!\n");
     
-    free(peer_addr);
+    printf("Peer: successfully connect to ptp_listening thread of remote peer!\n");
 
     // send data request through *sockfd*, specify filename and pieceNum
     ptp_request_t *request_pkt = (ptp_request_t *)malloc(sizeof(ptp_request_t));
-    request_pkt->filename =
-    request_pkt->pieceNum =
+    strcpy(request_pkt->filename, filename);
+    request_pkt->pieceNum = piece_arg->pieceNum;
+    request_pkt->offset = piece_arg->offset;
+    request_pkt->size = piece_arg->size;
+    
     download_send(sockfd, request_pkt);
     
-    // receive data from remote peer through *sockfd*
-    while (1) {
-        
+    int size = (int) piece_arg->size;
+    int pkt_count = size / MAX_DATA_LEN;
+    int remainder_len = size % MAX_DATA_LEN;
+    if (remainder_len > 0){
+        pkt_count++;
     }
     
+    char temp_filename[FILE_NAME_LEN];
+    memset(temp_filename, 0, FILE_NAME_LEN);
+    sprintf(temp_filename, "%s_%d", filename, request_pkt->pieceNum);
+    FILE* fp = fopen(temp_filename, "a");
+    
+    // receive data pkts from remote peer through *sockfd*
+    for (int i = 0; i < pkt_count; i++){
+        ptp_data_pkt_t *pkt = (ptp_data_pkt_t *)malloc(sizeof(ptp_data_pkt_t));
+        ptp_recvpkt(sockfd, pkt);
+        // extract data from pkt and save it into a temporary file
+        fwrite(pkt->data, pkt->size, 1, fp);
+        
+        free(pkt);
+    }
+    
+    fclose(fp);
     close(sockfd);
+    free(arg);
+    
+    // terminate this thread
+    pthread_detach(pthread_self());
+    pthread_exit(0);
+}
+
+// ptp_download thread is responsible for downloading one file from remote peer.
+// ptp_download thread is started after peer received a BROADCAST pkt and found difference between its local file table with the broadcasted file table.
+void* ptp_download(void* arg){
+    download_arg_t* download_arg = (download_arg_t *)arg;
+    char *filename = download_arg->filename;
+    struct sockaddr_in* peer_addr_list = download_arg->addr_list;
+    long fileSize = download_arg->size;
+    long pieceSize;
+    int remainder_len;
+    // divide one file into *peerNum* pieces
+    int peerNum;    // total num of pieces
+    if (download_arg->peerNum == 1){
+        peerNum = 1;
+        pieceSize = fileSize;
+        remainder_len = 0;
+    }
+    else{
+        peerNum = download_arg->peerNum - 1;
+        pieceSize = fileSize / peerNum;
+        remainder_len = fileSize % peerNum;
+        if (remainder_len > 0){
+            peerNum++;
+        }
+    }
+    
+    // download one file from multiple peers using multi-threading
+    pthread_t tid[peerNum];
+    for (int i = 0; i < peerNum; i++){
+        piece_download_arg_t *piece_arg = (piece_download_arg_t *)malloc(sizeof(piece_download_arg_t));
+        strcpy(piece_arg->filename, filename);
+        memmove(&piece_arg->peer_addr, &peer_addr_list[i], sizeof(piece_download_arg_t));
+        piece_arg->pieceNum = i;
+        piece_arg->offset = i * pieceSize;
+        piece_arg->size = (remainder_len > 0 && i == peerNum - 1)? remainder_len:pieceSize;
+
+        // create a piece_download thread for downloading the i_th piece of the file
+        pthread_create(&tid[i], NULL, piece_download, (void*)(piece_arg));
+    }
+    
+    // wait for all piece_download threads to terminate
+    for (int i = 0; i < peerNum; i++){
+        pthread_join(tid[i], NULL);
+    }
+    
+    // put all recieved pieces together
+    FILE* fp = fopen(filename, "a");
+    for (int i = 0; i < peerNum; i++){
+        char temp_filename[FILE_NAME_LEN];
+        memset(temp_filename, 0, FILE_NAME_LEN);
+        sprintf(temp_filename, "%s_%d", filename, i);
+        FILE* tmp = fopen(temp_filename, "r");
+        fseek(tmp, 0, SEEK_END);
+        int fileLen = ftell(tmp);
+        fseek(tmp, 0, SEEK_SET);
+        char *buffer = (char*)malloc(fileLen);
+        fread(buffer, fileLen, 1, tmp);
+        fclose(tmp);
+        
+        fwrite(buffer, fileLen, 1, fp);
+        free(buffer);
+    }
+    
+    fclose(fp);
+    printf("ptp_download: successfully received file %s!\n", filename);
+
+    free(arg);
+    
+    // update file_table and send HANDSHAKE pkt to tracker
+    
     
     // terminate this thread
     pthread_detach(pthread_self());
@@ -228,12 +347,11 @@ void* ptp_download(void* arg){
 // file_monitor thread monitors a local file directory
 // it sends out updated file table to tracker if any file changes in the local file directory.
 void* file_monitor(void* arg){
-    
+    return 0;
 }
 
 // keep_alive thread sends out heartbeat messages to tracker periodically.
 void* keep_alive(void* arg){
-    
     while (1){
         sleep(HEARTBEAT_INTERVAL);
         
@@ -302,10 +420,10 @@ int connect_to_tracker(){
     }
     
     // send a REGISTER pkt
-    
+    peer_sendpkt(sockfd, file_table, REGISTER);
     
     // wait for ACCEPT pkt from tracker
-    
+    peer_recvpkt(sockfd, file_table);
     
     return sockfd;
 }
@@ -341,7 +459,20 @@ int main(int argc, const char * argv[]) {
     // 3. create a ptp_download thread for each different file and update peer table
     // 4. (ptp_download thread) send HANDSHAKE pkt to tracker
     while (1){
+        // receive ptp_tracker_t from tracker
+        file_t *tracker_file_t = (file_t *)malloc(sizeof(file_t));
+        peer_recvpkt(tracker_conn, tracker_file_t);
         
+        // compare local file table with tracker's file table and find the files *to be updated*
+        
+        download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
+        //download_arg->filename =
+        // address list of available peers
+        //download_arg->addr =
+        
+        // create a ptp_download thread
+        pthread_t ptp_download_thread;
+        pthread_create(&ptp_download_thread, NULL, ptp_download, (void*)(download_arg));
     }
     
     return 0;
