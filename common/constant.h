@@ -23,6 +23,7 @@
 #define RESERVED_LEN 512
 #define IP_LEN 16
 #define FILE_NAME_LEN 256
+#define MAX_DATA_LEN 1464
 
 #define REGISTER 0
 #define KEEP_ALIVE 1

@@ -35,6 +35,31 @@ typedef struct segment_tracker{
     file_t  file_table;
 } ptp_tracker_t;
 
+// The packet data structure sending from peer to peer
+typedef struct segment_ptp{
+    char dest_ip[IP_LEN];
+    char file_path[FILE_NAME_LEN];
+    int pieceNum;
+    int totalNum;
+    // size of file Data
+    unsigned long size;
+    // fiel data contained in this pkt
+    char data[MAX_DATA_LEN];
+} ptp_data_pkt_t;
+
+// data structure of the arguments parsed from ptp_listening thread to ptp_upload thread
+typedef struct upload_arg_ptp{
+    int sockfd;
+    char file_path[FILE_NAME_LEN];
+    int pieceNum;
+} upload_arg_t;
+
+// structure of data request sent from remote peer
+typedef struct data_request_ptp{
+    char filename[FILE_NAME_LEN];
+    int pieceNum;
+} ptp_request_t;
+
 // Tracker receives packet from peer
 int tracker_recvpkt(int connection, ptp_peer_t *pkt);
 
@@ -46,6 +71,12 @@ int peer_sendpkt(int conn, file_t *ft, int type);
 
 // Peer receives packet from tracker and unpacks trackers file table 
 int peer_recvpkt(int conn, file_t *ft);
+
+// Peer sends data packet to another peer
+int ptp_sendpkt(int conn, ptp_data_pkt_t *pkt);
+
+// Peer receives data packet from another peer
+int ptp_recvpkt(int conn, ptp_data_pkt_t *pkt);
 
 #endif // pkt_h
 

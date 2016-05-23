@@ -26,6 +26,7 @@ typedef struct _peer_side_peer_t {
     struct _peer_side_peer_t *next;
 } peer_peer_t;
 
+
 // ptp_listening thread keeps receiving data requests from other peers. It handles data requests by creating a P2P upload thread.
 // ptp_listening thread is started after the peer is registered.
 void* ptp_listening(void* arg);

@@ -17,6 +17,116 @@ file_t *filetable_create(){
     return ft;
 }
 
+// ptp_listening thread: parse data request from remote peer
+int recv_data_request(int conn, char* filename, int* pieceNum){
+    ptp_request_t request_pkt;
+    char buf[sizeof(ptp_request_t)+2];
+    char c;
+    int idx = 0;
+    // state can be 0,1,2,3;
+    // 0 starting point
+    // 1 '!' received
+    // 2 '&' received, start receiving segment
+    // 3 '!' received,
+    // 4 '#' received, finish receiving segment
+    int state = 0;
+    while(recv(conn,&c,1,0)>0) {
+        if (state == 0) {
+            if(c=='!')
+                state = 1;
+        }
+        else if(state == 1) {
+            if(c=='&')
+                state = 2;
+            else
+                state = 0;
+        }
+        else if(state == 2) {
+            if(c=='!') {
+                buf[idx]=c;
+                idx++;
+                state = 3;
+            }
+            else {
+                buf[idx]=c;
+                idx++;
+            }
+        }
+        else if(state == 3) {
+            if(c=='#') {
+                buf[idx]=c;
+                idx++;
+                state = 0;
+                idx = 0;
+                memmove(&request_pkt, buf, sizeof(ptp_request_t));
+                strcpy(filename, request_pkt.filename);
+                *pieceNum = request_pkt.pieceNum;
+                return 1;
+            }
+            else if(c=='!') {
+                buf[idx]=c;
+                idx++;
+            }
+            else {
+                buf[idx]=c;
+                idx++;
+                state = 2;
+            }
+        }
+    }
+    return -1;
+}
+
+// ptp_upload thread: peer wraps file data and send it to remote peer
+int upload_send(int conn, char * file_path, int pieceNum){
+    FILE *fp;
+    if ((fp = fopen(file_path, "r")) == NULL){
+        printf("Cannot find %s!\n", file_path);
+        return -1;
+    }
+    
+    ptp_data_pkt_t *pkt = (ptp_data_pkt_t *)malloc(sizeof(ptp_data_pkt_t));
+    memset(pkt, 0, sizeof(ptp_data_pkt_t));
+    fseek(fp, pieceNum * sizeof(char) * MAX_DATA_LEN, SEEK_SET); // pieceNum starts from 0, 1, 2...
+    fread(pkt->data, sizeof(char), MAX_DATA_LEN, fp);
+    
+    pkt->pieceNum = pieceNum;
+    pkt->size = strlen(pkt->data);
+    
+    if (ptp_sendpkt(conn, pkt) < 0){
+        return -1;
+    }
+    
+    fclose(fp);
+    return 1;
+}
+
+// ptp_download thread: send data request to remote peer
+int download_send(int conn, ptp_request_t *request_pkt){
+    char bufstart[2];
+    char bufend[2];
+    bufstart[0] = '!';
+    bufstart[1] = '&';
+    bufend[0] = '!';
+    bufend[1] = '#';
+    
+    if (send(conn, bufstart, 2, 0) < 0) {
+        free(request_pkt);
+        return -1;
+    }
+    if(send(conn, request_pkt, sizeof(ptp_request_t), 0) < 0) {
+        free(request_pkt);
+        return -1;
+    }
+    if(send(conn, bufend, 2, 0) < 0) {
+        free(request_pkt);
+        return -1;
+    }
+    printf("~> sent data request to peer\n");
+    free(request_pkt);
+    return 1;
+}
+
 // ptp_listening thread keeps receiving data requests from other peers. It handles data requests by creating a P2P upload thread.
 // ptp_listening thread is started after the peer is registered.
 void* ptp_listening(void* arg){
@@ -33,28 +143,43 @@ void* ptp_listening(void* arg){
         }
         printf("ptp_listening: received a peer request!\n");
         
-        int *sockfd = (int *)malloc(sizeof(int));
-        *sockfd = conn;
+        // receive a data request pkt from remote peer
+        char filename[FILE_NAME_LEN];
+        int pieceNum;
+        recv_data_request(conn, filename, &pieceNum);
+        
+        // parse the request info
+        upload_arg_t *arg = (upload_arg_t *)malloc(sizeof(upload_arg_t));
+        arg->sockfd = conn;
+        arg->pieceNum = pieceNum;
+        
+        // change filename into file path
+        char file_path[FILE_NAME_LEN];
+        strcpy(file_path, WATCHING);
+        strcat(file_path, filename);
+        printf("data request: file_path = %s\n", file_path);
+        strcpy(arg->file_path, file_path);
+        
         // create a ptp_upload thread
         pthread_t ptp_upload_thread;
-        pthread_create(&ptp_upload_thread, NULL, ptp_upload, (void*)(sockfd));
+        pthread_create(&ptp_upload_thread, NULL, ptp_upload, (void*)(arg));
         printf("ptp_listening: created a ptp_upload thread with sockfd = %d!\n", conn);
     }
 }
 
 // ptp_upload thread is started by listen_to_peer thread and responsible for uploading data to remote peer.
 void* ptp_upload(void* arg){
-    //struct sockaddr_in * peer_addr = (struct sockaddr_in *) arg;
-    int sockfd = * ((int *)arg);
-    free(arg);
+    upload_arg_t * upload_arg = (upload_arg_t *)arg;
+    int sockfd =  upload_arg -> sockfd;
+    char *file_path = upload_arg -> file_path;
+    int pieceNum = upload_arg -> pieceNum;
 
-    printf("Peer: start sending data to ptp_download thread of remote peer!\n");
-    
     // send data to remote peer through *sockfd*
-    
-    
+    upload_send(sockfd, file_path, pieceNum);
+    printf("Peer_upload: sent data pkt to remote peer!\n");
     
     close(sockfd);
+    free(arg);
     
     // terminate this thread
     pthread_detach(pthread_self());
@@ -82,6 +207,12 @@ void* ptp_download(void* arg){
     
     free(peer_addr);
 
+    // send data request through *sockfd*, specify filename and pieceNum
+    ptp_request_t *request_pkt = (ptp_request_t *)malloc(sizeof(ptp_request_t));
+    request_pkt->filename =
+    request_pkt->pieceNum =
+    download_send(sockfd, request_pkt);
+    
     // receive data from remote peer through *sockfd*
     while (1) {
         
