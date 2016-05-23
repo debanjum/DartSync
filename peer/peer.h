@@ -11,6 +11,7 @@
 
 #include "../common/constant.h"
 #include "../common/pkt.h"
+#include "p2p.h"
 
 /* Peer-side peer table */
 typedef struct _peer_side_peer_t {
@@ -26,7 +27,6 @@ typedef struct _peer_side_peer_t {
     struct _peer_side_peer_t *next;
 } peer_peer_t;
 
-
 // ptp_listening thread keeps receiving data requests from other peers. It handles data requests by creating a P2P upload thread.
 // ptp_listening thread is started after the peer is registered.
 void* ptp_listening(void* arg);
@@ -34,7 +34,10 @@ void* ptp_listening(void* arg);
 // p2p_upload thread is started by listen_to_peer thread and responsible for uploading data to remote peer.
 void* ptp_upload(void* arg);
 
-// p2p_download thread is responsible for downloading data from remote peer.
+// piece_download thread is for downloading one piece of file from a remote peer.
+void* piece_download(void* arg);
+    
+// p2p_download thread is responsible for downloading one file from multiple peers.
 void* ptp_download(void* arg);
 
 // file_monitor thread monitors a local file directory
@@ -43,5 +46,6 @@ void* file_monitor(void* arg);
 
 // keep_alive thread sends out heartbeat messages to tracker periodically.
 void* keep_alive(void* arg);
+
 
 #endif /* peer_h */
