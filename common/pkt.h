@@ -23,7 +23,7 @@ typedef struct segment_peer {
     // the number of files in the local file table -- optional
     int file_table_size;
     // file table of the client -- your own design
-    file_t file_table;
+    Node file;
 } ptp_peer_t;
 
 
@@ -32,7 +32,7 @@ typedef struct segment_tracker{
     // file number in the file table -- optional
     int file_table_size;
     // file table of the tracker -- your own design
-    file_t  file_table;
+    Node file;
 } ptp_tracker_t;
 
 // The packet data structure sending from peer to peer
@@ -41,7 +41,7 @@ typedef struct segment_ptp{
     int pieceNum;
     // size of file Data
     unsigned long size;
-    // fiel data contained in this pkt
+    // file data contained in this pkt
     char data[MAX_DATA_LEN];
 } ptp_data_pkt_t;
 
@@ -79,7 +79,7 @@ typedef struct piece_download_arg_ptp{
 } piece_download_arg_t;
 
 // Tracker receives packet from peer
-int tracker_recvpkt(int connection, ptp_peer_t *pkt);
+int tracker_recvpkt(int connection, ptp_peer_t *pkt, file_t *ft);
 
 // Tracker sends packet to peer with its current file table wrapped
 int tracker_sendpkt(int conn, file_t *ft);

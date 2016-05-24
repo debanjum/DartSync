@@ -26,10 +26,15 @@
 #define FILE_NAME_LEN 256
 #define MAX_DATA_LEN 1464
 
+// Packet Type
 #define REGISTER 0
 #define KEEP_ALIVE 1
 #define FILE_UPDATE 2
-#define ACCEPT 3
+
+// Node Type: File Created, Updated, or Deleted
+#define FILE_CREATE 3
+#define FILE_MODIFY 4
+#define FILE_DELETE 5
 
 #define MAX_PEER_NUM 5
 
@@ -50,6 +55,8 @@ typedef struct node{
     char *name;
     //the timestamp when the file is modified or created
     unsigned long int timestamp;
+    //the type of file update
+    int type;
     //pointer to build the linked list
     struct node *pNext;
     //for the file table on peers, it is the ip address of the peer

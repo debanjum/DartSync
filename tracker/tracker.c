@@ -14,13 +14,14 @@ file_t *ft                = NULL;   //File Table
 void* handshake(void* arg) {
     int connection = *(int *)arg;
     ptp_peer_t* recv_pkt = (ptp_peer_t *)calloc(1,sizeof(ptp_peer_t));
+    file_t *peer_ft = NULL;
     
-    while(tracker_recvpkt(connection, recv_pkt)) {
+    while(tracker_recvpkt(connection, recv_pkt, peer_ft)) {
 	if(recv_pkt->type==REGISTER)
-	    tracker_sendpkt(connection, ft);          // send tracker file_table to peer as response
+	    tracker_sendpkt(connection, ft);      // send tracker file_table to peer as response
 	else if(recv_pkt->type==FILE_UPDATE) {
-	    update_filetable(&recv_pkt->file_table);  // update tracker file_table based on information from peer's file_table
-	    broadcast_filetable();                    // send updated tracker file_table to all peers
+	    update_filetable(peer_ft);            // update tracker file_table based on information from peer's file_table
+	    broadcast_filetable();                // send updated tracker file_table to all peers
 	}
     }
     free(recv_pkt);
