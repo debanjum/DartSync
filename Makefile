@@ -4,8 +4,10 @@ common/pkt.o: common/pkt.c common/pkt.h common/constant.h
 	gcc -Wall -pedantic -std=c99 -g -c common/pkt.c -o common/pkt.o
 peer/monitor.o: peer/monitor.c 
 	gcc -Wall -pedantic -std=c99 -g -c peer/monitor.c -o peer/monitor.o
-peer/peer: peer/peer.c common/pkt.o
-	gcc -Wall -pedantic -std=c99 -g -pthread peer/peer.c common/pkt.o -o peer/peer
+peer/p2p.o: peer/p2p.c peer/p2p.h
+	gcc -Wall -pedantic -std=c99 -g -c peer/p2p.c -o peer/p2p.o
+peer/peer: peer/peer.c common/pkt.o peer/p2p.o
+	gcc -Wall -pedantic -std=c99 -g -pthread peer/peer.c common/pkt.o peer/p2p.o -o peer/peer
 tracker/tracker: tracker/tracker.c common/pkt.o
 	gcc -Wall -pedantic -std=c99 -g -pthread tracker/tracker.c common/pkt.o -o tracker/tracker
 etags:
