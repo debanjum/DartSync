@@ -5,7 +5,8 @@
 //  Created by Lexin Tang on 5/18/16.
 //  Copyright © 2016 Lexin Tang. All rights reserved.
 //
-
+#include <sys/time.h>
+#include <time.h>
 #include "peer.h"
 
 int ptp_listen_fd, tracker_conn;
@@ -112,22 +113,41 @@ void* piece_download(void* arg){
     if (remainder_len > 0){
         pkt_count++;
     }
-    
+    printf("piece_arg->size = %d\n", size);
     char temp_filename[FILE_NAME_LEN];
     memset(temp_filename, 0, FILE_NAME_LEN);
     sprintf(temp_filename, "%s_%d", filename, request_pkt->pieceNum);
-    FILE* fp = fopen(temp_filename, "a");
     
+    FILE* fp = fopen(temp_filename, "a");
+    if (fp == NULL){
+        printf("cannot open %s\n", temp_filename);
+    }
+    nanosleep((const struct timespec[]){{0, RECV_INTERVAL}}, NULL);
+    
+    printf("successfully open %s\n", temp_filename);
     // receive data pkts from remote peer through *sockfd*
+    printf("total num of data pkts = %d\n", pkt_count);
+    
+    char *buffer = (char *)malloc(size);
+    memset(buffer, 0, size);
+    
     for (int i = 0; i < pkt_count; i++){
-        ptp_data_pkt_t *pkt = (ptp_data_pkt_t *)malloc(sizeof(ptp_data_pkt_t));
-        ptp_recvpkt(sockfd, pkt);
+        //ptp_data_pkt_t *pkt = (ptp_data_pkt_t *)malloc(sizeof(ptp_data_pkt_t));
+        ptp_data_pkt_t pkt;
+        memset(&pkt, 0, sizeof(ptp_data_pkt_t));
+        printf("ready to receive data pkt id = %d!\n", i);
+        ptp_recvpkt(sockfd, &pkt);
         // extract data from pkt and save it into a temporary file
-        fwrite(pkt->data, pkt->size, 1, fp);
-        
-        free(pkt);
+        printf("successfully received data pkt id = %d!\n", i);
+        //printf("pkt->size = %lu\n", pkt.size);
+        //printf("pkt->pieceNum = %d\n", pkt.pieceNum);
+        nanosleep((const struct timespec[]){{0, RECV_INTERVAL}}, NULL);
+        memmove(&buffer[i * MAX_DATA_LEN], pkt.data, pkt.size);
+        //free(pkt);
     }
     
+    fwrite(buffer, size, 1, fp);
+    free(buffer);
     fclose(fp);
     close(sockfd);
     free(arg);
@@ -143,8 +163,8 @@ void* ptp_download(void* arg){
     download_arg_t* download_arg = (download_arg_t *)arg;
     char *filename = download_arg->filename;
     struct sockaddr_in* peer_addr_list = download_arg->addr_list;
-    long fileSize = download_arg->size;
-    long pieceSize;
+    unsigned long fileSize = download_arg->size;
+    unsigned long pieceSize;
     int remainder_len;
     // divide one file into *peerNum* pieces
     int peerNum;    // total num of pieces
@@ -153,7 +173,12 @@ void* ptp_download(void* arg){
         pieceSize = fileSize;
         remainder_len = 0;
     }
-    else{
+    else if (download_arg->peerNum == 2) {
+        peerNum = 2;
+        pieceSize = (fileSize + 1) / 2;
+        remainder_len = fileSize - pieceSize;
+    }
+    else {
         peerNum = download_arg->peerNum - 1;
         pieceSize = fileSize / peerNum;
         remainder_len = fileSize % peerNum;
@@ -161,17 +186,22 @@ void* ptp_download(void* arg){
             peerNum++;
         }
     }
+    printf("peerNum = %d\n", peerNum);
+    printf("pieceSize = %lu\n", pieceSize);
+    printf("remainder_len = %d\n", remainder_len);
     
     // download one file from multiple peers using multi-threading
     pthread_t tid[peerNum];
     for (int i = 0; i < peerNum; i++){
         piece_download_arg_t *piece_arg = (piece_download_arg_t *)malloc(sizeof(piece_download_arg_t));
         strcpy(piece_arg->filename, filename);
-        memmove(&piece_arg->peer_addr, &peer_addr_list[i], sizeof(piece_download_arg_t));
+        memmove(&piece_arg->peer_addr, &peer_addr_list[i], sizeof(struct sockaddr_in));
         piece_arg->pieceNum = i;
         piece_arg->offset = i * pieceSize;
         piece_arg->size = (remainder_len > 0 && i == peerNum - 1)? remainder_len:pieceSize;
-
+        printf("pieceNum = %d\n", piece_arg->pieceNum);
+        printf("piece size = %lu\n", piece_arg->size);
+        printf("creating piece_download thread!\n");
         // create a piece_download thread for downloading the i_th piece of the file
         pthread_create(&tid[i], NULL, piece_download, (void*)(piece_arg));
     }
@@ -180,22 +210,29 @@ void* ptp_download(void* arg){
     for (int i = 0; i < peerNum; i++){
         pthread_join(tid[i], NULL);
     }
-    
+    printf("successfully received all pieces!\n");
     // put all recieved pieces together
-    FILE* fp = fopen(filename, "a");
+    // ? use temp file: will be noticed by inotify!! use buffer instead
+    FILE* fp = fopen(filename, "w");
     for (int i = 0; i < peerNum; i++){
         char temp_filename[FILE_NAME_LEN];
         memset(temp_filename, 0, FILE_NAME_LEN);
         sprintf(temp_filename, "%s_%d", filename, i);
         FILE* tmp = fopen(temp_filename, "r");
+        if (tmp == NULL){
+            printf("cannot open %s!\n", temp_filename);
+        }
         fseek(tmp, 0, SEEK_END);
         int fileLen = ftell(tmp);
         fseek(tmp, 0, SEEK_SET);
+        printf("fileLen = %d\n", fileLen);
         char *buffer = (char*)malloc(fileLen);
+        //char buffer[fileLen];
         fread(buffer, fileLen, 1, tmp);
         fclose(tmp);
         
         fwrite(buffer, fileLen, 1, fp);
+        printf("going to free buffer!\n");
         free(buffer);
     }
     
@@ -205,7 +242,7 @@ void* ptp_download(void* arg){
     free(arg);
     
     // update file_table and send HANDSHAKE pkt to tracker
-    
+    // no need to do so.. because add-file will be noticed by file monitor
     
     // terminate this thread
     pthread_detach(pthread_self());
@@ -296,6 +333,7 @@ int connect_to_tracker(){
     return sockfd;
 }
 
+/*
 int main(int argc, const char * argv[]) {
     printf("Peer: initializing...\n");
     
@@ -345,3 +383,4 @@ int main(int argc, const char * argv[]) {
     
     return 0;
 }
+*/
