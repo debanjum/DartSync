@@ -333,7 +333,7 @@ int connect_to_tracker(){
     return sockfd;
 }
 
-/*
+
 int main(int argc, const char * argv[]) {
     printf("Peer: initializing...\n");
     
@@ -383,4 +383,3 @@ int main(int argc, const char * argv[]) {
     
     return 0;
 }
-*/
