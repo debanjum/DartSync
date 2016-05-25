@@ -79,7 +79,7 @@ int upload_send(int conn, char* file_path, int pieceNum, unsigned long offset, u
         
         // filename? timestamp?
         pkt->pieceNum = pieceNum;
-        pkt->size = strlen(pkt->data);
+        pkt->size = length;
         
         if (ptp_sendpkt(conn, pkt) < 0){
             return -1;
