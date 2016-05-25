@@ -10,149 +10,41 @@
 
 // Peer sends data packet to another peer
 int ptp_sendpkt(int conn, ptp_data_pkt_t *pkt){
-    char bufstart[2];
-    char bufend[2];
-    bufstart[0] = '!';
-    bufstart[1] = '&';
-    bufend[0] = '!';
-    bufend[1] = '#';
-    
-    if (send(conn, bufstart, 2, 0) < 0) {
-        free(pkt);
-        return -1;
-    }
     if(send(conn, pkt, sizeof(ptp_data_pkt_t), 0) < 0) {
         free(pkt);
         return -1;
     }
-    if(send(conn, bufend, 2, 0) < 0) {
-        free(pkt);
-        return -1;
-    }
     printf("~> sent data pkt to peer\n");
+    printf("ptp_sendpkt: pkt size = %lu\n", pkt->size);
+    printf("ptp_sendpkt: pkt pieceNum = %d\n", pkt->pieceNum);
     free(pkt);
     return 1;
 }
 
 // Peer receives data packet from another peer
 int ptp_recvpkt(int conn, ptp_data_pkt_t *pkt){
-    char buf[sizeof(ptp_data_pkt_t)+2];
-    char c;
-    int idx = 0;
-    // state can be 0,1,2,3;
-    // 0 starting point
-    // 1 '!' received
-    // 2 '&' received, start receiving segment
-    // 3 '!' received,
-    // 4 '#' received, finish receiving segment
-    int state = 0;
-    while(recv(conn,&c,1,0)>0) {
-        if (state == 0) {
-            if(c=='!')
-                state = 1;
-        }
-        else if(state == 1) {
-            if(c=='&')
-                state = 2;
-            else
-                state = 0;
-        }
-        else if(state == 2) {
-            if(c=='!') {
-                buf[idx]=c;
-                idx++;
-                state = 3;
-            }
-            else {
-                buf[idx]=c;
-                idx++;
-            }
-        }
-        else if(state == 3) {
-            if(c=='#') {
-                buf[idx]=c;
-                idx++;
-                state = 0;
-                idx = 0;
-                memmove(pkt, buf, sizeof(ptp_data_pkt_t));
-                return 1;
-            }
-            else if(c=='!') {
-                buf[idx]=c;
-                idx++;
-            }
-            else {
-                buf[idx]=c;
-                idx++;
-                state = 2;
-            }
-        }
+    if (recv(conn, pkt, sizeof(ptp_data_pkt_t), 0) == -1){
+        perror("socket receive error!\n");
+        return -1;
     }
-    return -1;
+    printf("ptp_recvpkt: pkt size = %lu\n", pkt->size);
+    return 1;
 }
 
 // ptp_listening thread: parse data request from remote peer
 int recv_data_request(int conn, char* filename, int* pieceNum, unsigned long* offset, unsigned long* size){
     ptp_request_t request_pkt;
-    char buf[sizeof(ptp_request_t)+2];
-    char c;
-    int idx = 0;
-    // state can be 0,1,2,3;
-    // 0 starting point
-    // 1 '!' received
-    // 2 '&' received, start receiving segment
-    // 3 '!' received,
-    // 4 '#' received, finish receiving segment
-    int state = 0;
-    while(recv(conn,&c,1,0)>0) {
-        if (state == 0) {
-            if(c=='!')
-                state = 1;
-        }
-        else if(state == 1) {
-            if(c=='&')
-                state = 2;
-            else
-                state = 0;
-        }
-        else if(state == 2) {
-            if(c=='!') {
-                buf[idx]=c;
-                idx++;
-                state = 3;
-            }
-            else {
-                buf[idx]=c;
-                idx++;
-            }
-        }
-        else if(state == 3) {
-            if(c=='#') {
-                buf[idx]=c;
-                idx++;
-                state = 0;
-                idx = 0;
-                memmove(&request_pkt, buf, sizeof(ptp_request_t));
-                strcpy(filename, request_pkt.filename);
-                *pieceNum = request_pkt.pieceNum;
-                *offset = request_pkt.offset;
-                *size = request_pkt.size;
-                return 1;
-            }
-            else if(c=='!') {
-                buf[idx]=c;
-                idx++;
-            }
-            else {
-                buf[idx]=c;
-                idx++;
-                state = 2;
-            }
-        }
+    if (recv(conn, &request_pkt, sizeof(ptp_request_t), 0) == -1){
+        perror("socket receive error!\n");
+        return -1;
     }
-    return -1;
+    
+    strcpy(filename, request_pkt.filename);
+    *pieceNum = request_pkt.pieceNum;
+    *offset = request_pkt.offset;
+    *size = request_pkt.size;
+    return 1;
 }
-
 
 // ptp_upload thread: peer wraps file data and send them to remote peer
 int upload_send(int conn, char* file_path, int pieceNum, unsigned long offset, unsigned long size){
@@ -200,22 +92,7 @@ int upload_send(int conn, char* file_path, int pieceNum, unsigned long offset, u
 
 // ptp_download thread: send data request to remote peer
 int download_send(int conn, ptp_request_t *request_pkt){
-    char bufstart[2];
-    char bufend[2];
-    bufstart[0] = '!';
-    bufstart[1] = '&';
-    bufend[0] = '!';
-    bufend[1] = '#';
-    
-    if (send(conn, bufstart, 2, 0) < 0) {
-        free(request_pkt);
-        return -1;
-    }
     if(send(conn, request_pkt, sizeof(ptp_request_t), 0) < 0) {
-        free(request_pkt);
-        return -1;
-    }
-    if(send(conn, bufend, 2, 0) < 0) {
         free(request_pkt);
         return -1;
     }
