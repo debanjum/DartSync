@@ -35,6 +35,11 @@
 #define FILE_CREATE 3
 #define FILE_MODIFY 4
 #define FILE_DELETE 5
+#define FILE_OPEN 6
+#define FILE_OPEN_MODIFY 7 // opened in edit mode
+
+#define IS_FILE 1
+#define IS_DIR 2
 
 #define MAX_PEER_NUM 5
 
@@ -50,6 +55,8 @@
 
 // each file can be represented as a node in file table
 typedef struct node{
+    // is file or directory
+    short status;
     //the size of the file
     long size;
     //the name of the file
