@@ -481,7 +481,7 @@ void compareNode(Node *seekNode) {
         // fill in the data for download_arg
         download_arg->filename = *current->name;
 
-        int peers = sizeof(current->newpeerip)/IP_LEN);
+        int peers = (sizeof(current->newpeerip))/IP_LEN;
         download_arg->peerNum = peers;
         for (int i = 0; i < peers; i++) {
             struct sockaddr_in address;
@@ -542,7 +542,6 @@ int main(int argc, const char * argv[]) {
         }
 
         // free the table
-
         Node *ptr = trackerFileTable->head;
         // if the pointer does not point to NULL
         if (ptr != NULL) {
