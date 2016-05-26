@@ -3,10 +3,12 @@
 //  peer
 //
 //  Created by Lexin Tang on 5/18/16.
-//  Copyright © 2016 Lexin Tang. All rights reserved.
+//  Copyright Â© 2016 Lexin Tang. All rights reserved.
 //
-
-#define _DEFAULT_SOURCE              //refer: https://stackoverflow.com/questions/3355298/unistd-h-and-c99-on-linux + warning message
+#include <stdio.h>
+#include <string.h>
+#include <sys/time.h>
+#include <time.h>
 #include "peer.h"
 
 int ptp_listen_fd, tracker_conn;
@@ -15,6 +17,7 @@ file_t *file_table;
 // this function is used to initialize file table
 file_t *filetable_create(){
     file_t *ft = (file_t *)malloc(sizeof(file_t));
+    ft->head = NULL;
     return ft;
 }
 
@@ -255,14 +258,86 @@ void* file_monitor(void* arg){
     return 0;
 }
 
+// add a node to our local file table to represent a new file in our local directory
+void add(download_arg_t *down) {
+    // get the head of the local file table
+    Node *current = file_table->head;
+
+    // iterate to the end of the linked list to add at the end
+    while (current != NULL) {
+        current = current->pNext;
+    }
+
+    // set up the node
+    current = (Node *)malloc(sizeof(Node));
+    current->size = down->size;
+    current->name = (char *)malloc(sizeof(char * FILE_NAME_LEN));
+    current->name = down->filename;
+    current->timestamp = down->timestamp;
+    current->pNext = NULL;
+
+    // fill in the peer ip addresses
+    for (int i = 0; i < down->peerNum; i++) {
+        char *address;
+        current->newpeerip[i] = inet_ntoa(addr_list[i]);
+    }
+}
+
+// modify a node in our local file table to represent changes in our local directory
+void modify(download_arg_t *down) {
+    // get the head of the local file table
+    Node *current = file_table->head;
+
+    // find the node that you are searching for
+    while (strcmp(*current->name, down->filename) != 0) {
+        current = current->pNext;
+    }
+
+    // modify the node's information
+    current->size = down->size;
+    current->name = down->filename;
+    current->timestamp = down->timestamp;
+
+    // modify the peer ip addresses
+    for (int i = 0; i < down->peerNum; i++) {
+        char *address;
+        current->newpeerip[i] = inet_ntoa(addr_list[i]);
+    }
+}
+
+// delete a node from our local file table to reflect changes in the global directory
+void delete(Node *find) {
+
+    // get the head of the file table
+    Node *current = file_table->head;
+
+    // if the node we want to delete is the head
+    if (strcmp(*current->name, *find->name) == 0) {
+        Node *toDelete = current;
+        file_table->head = current->pNext;
+        free(toDelete->name);
+        free(toDelete);
+    }
+
+    else {
+        while (strcmp(*current->pNext->name, *find->name) != 0) {
+            current = current->pNext;
+        }
+
+        Node *toDelete = current->pNext;
+        current->pNext = current->pNext->pNext;
+        free(toDelete->name);
+        free(toDelete);
+    }
+}
+
 // keep_alive thread sends out heartbeat messages to tracker periodically.
 void* keep_alive(void* arg){
     while (1){
         sleep(HEARTBEAT_INTERVAL);
         
         // send HEARTBEAT pkt to tracker
-        
-        
+        peer_sendpkt(tracker_conn, file_table, KEEP_ALIVE);
     }
 }
 
@@ -296,7 +371,18 @@ void ptp_listen_thread_init(){
 }
 
 void ft_destroy(){
-    
+    Node *ptr = file_table->head;
+
+    // if the pointer does not point to NULL
+    if (ptr != NULL) {
+        free(ptr->name);    // free the name of the file
+        Node *current = *ptr;
+        ptr = ptr->pNext;   // get the next node
+        free(current);  // free the current node
+    }
+
+    // free the entire file table
+    free(file_table);
 }
 
 void peer_stop(){
@@ -333,6 +419,85 @@ int connect_to_tracker(){
     return sockfd;
 }
 
+// this function is used to find a certain node in our file table and modify it (or add it) if
+// necessary
+void compareNode(Node *seekNode) {
+
+    Node *current = file_table->head;   // get the head of the local file table
+
+    // attempt to find the file
+    while (current != NULL && strcmp(*current->name, *seekNode->name) != 0) {
+        current = current->pNext;
+    }
+
+    // check if we need to update the file we found
+    if (current != NULL) {
+
+        // compare the timestamps and see if the file needs to be updated to a newer version
+        if (current->timestamp < seekNode->timestamp) {
+
+            // if we need to modify the file
+            if (current->status != FILE_DELETE) {
+
+                download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
+
+                // fill in the data for download_arg
+                download_arg->filename = *current->name;
+
+                int peers = (sizeof(current->newpeerip))/IP_LEN;
+                download_arg->peerNum = peers;
+                for (int i = 0; i < peers; i++) {
+                    struct sockaddr_in address;
+                    inet_aton(newpeerip[i], &address.sin_addr);
+                    download_arg->addr_list[i] = address;
+                }
+                download_arg->size = current->size;
+                download_arg->timestamp = current->timestamp;
+
+                // create a ptp_download thread
+                pthread_t ptp_download_thread;
+                pthread_create(&ptp_download_thread, NULL, ptp_download, (void*)download_arg);
+            }
+
+            // otherwise, we need to delete the file
+            else {
+
+                // delete the file from the local directory first
+                int ret = remove(*current->name);
+                if (ret != 0) {
+                    perror("Unable to delete the file");
+                }
+                
+                delete(current);
+            }
+        }
+    }
+
+    // we have a new file that we need to download
+    else {
+
+        download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
+
+        // fill in the data for download_arg
+        download_arg->filename = *current->name;
+
+        int peers = sizeof(current->newpeerip)/IP_LEN);
+        download_arg->peerNum = peers;
+        for (int i = 0; i < peers; i++) {
+            struct sockaddr_in address;
+            inet_aton(newpeerip[i], &address.sin_addr);
+            download_arg->addr_list[i] = address;
+        }
+        download_arg->size = current->size;
+        download_arg->timestamp = current->timestamp;
+
+        // create a ptp_download thread
+        pthread_t ptp_download_thread;
+        pthread_create(&ptp_download_thread, NULL, ptp_download, (void*)download_arg);
+
+    }
+
+}
 
 int main(int argc, const char * argv[]) {
     printf("Peer: initializing...\n");
@@ -365,20 +530,29 @@ int main(int argc, const char * argv[]) {
     // 3. create a ptp_download thread for each different file and update peer table
     // 4. (ptp_download thread) send HANDSHAKE pkt to tracker
     while (1){
-        // receive ptp_tracker_t from tracker
-        file_t *tracker_file_t = (file_t *)malloc(sizeof(file_t));
-        peer_recvpkt(tracker_conn, tracker_file_t);
-        
-        // compare local file table with tracker's file table and find the files *to be updated*
-        
-        download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
-        //download_arg->filename =
-        // address list of available peers
-        //download_arg->addr =
-        
-        // create a ptp_download thread
-        pthread_t ptp_download_thread;
-        pthread_create(&ptp_download_thread, NULL, ptp_download, (void*)(download_arg));
+        // receive file table from tracker
+        file_t *trackerFileTable = (file_t *)malloc(sizeof(file_t));
+        peer_recvpkt(tracker_conn, trackerFileTable);
+
+        // iterate through nodes in tracker's file table and find the files to be updated
+        Node *current = trackerFileTable->head;
+        while (current != NULL) {
+            compareNode(current);
+            current = current->pNext;
+        }
+
+        // free the table
+
+        Node *ptr = trackerFileTable->head;
+        // if the pointer does not point to NULL
+        if (ptr != NULL) {
+            free(ptr->name);    // free the name of the file
+            Node *current = *ptr;
+            ptr = ptr->pNext;   // get the next node
+            free(current);  // free the current node
+        }
+
+        free(trackerFileTable);
     }
     
     return 0;
