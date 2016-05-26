@@ -43,6 +43,7 @@ typedef struct download_arg_ptp{
     char filename[FILE_NAME_LEN];
     unsigned long size;   // file size
     int peerNum; // num of available peers
+    unsigned long int timestamp;    // file timestamp
     struct sockaddr_in addr_list[MAX_PEER_NUM];
 } download_arg_t;
 
