@@ -52,7 +52,7 @@
 #define HEARTBEAT_TIMEOUT 240   // Peer dead if Tracker doesn't hear its heartbeat not heard for this long
 #define RECV_INTERVAL 1000000
 
-#define TRACKER_IP "127.0.0.1"  // Tracker IP
+#define TRACKER_IP "129.170.214.115"  // Tracker IP[flume currently]
 #define WATCHING "./"
 
 // each file can be represented as a node in file table

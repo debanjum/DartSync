@@ -237,7 +237,7 @@ int main() {
     struct sockaddr_in tracker_addr;
     int connection;
     struct sockaddr_in peer_addr;
-    socklen_t peer_addr_len;
+    socklen_t peer_addr_len = sizeof(struct sockaddr_in);
     
     peer_sockfd = socket(AF_INET, SOCK_STREAM, 0); 
     if(peer_sockfd<0) 
