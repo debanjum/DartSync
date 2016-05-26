@@ -16,14 +16,21 @@ void* handshake(void* arg) {
     ptp_peer_t* recv_pkt = (ptp_peer_t *)calloc(1,sizeof(ptp_peer_t));
     file_t *peer_ft = NULL;
     
-    while(tracker_recvpkt(connection, recv_pkt, peer_ft)) {
+    while( tracker_recvpkt(connection, recv_pkt, peer_ft) > 0 ) {
+	
 	if(recv_pkt->type==REGISTER)
 	    tracker_sendpkt(connection, ft);      // send tracker file_table to peer as response
+	
 	else if(recv_pkt->type==FILE_UPDATE) {
 	    update_filetable(peer_ft);            // update tracker file_table based on information from peer's file_table
 	    broadcast_filetable();                // send updated tracker file_table to all peers
 	}
+	
+	else if(recv_pkt->type==KEEP_ALIVE) {     // if receive heartbeat message(KEEP_ALIVE)
+	    heard_peer(connection);               // update last_heard timestamp of peer with 'connection'
+	}
     }
+    
     free(recv_pkt);
     return 0;
 }
@@ -156,6 +163,17 @@ int delete_peer(int peer_sockfd)
     for( temp = peer_head; temp != NULL; temp = temp->next )
 	if (temp->sockfd == peer_sockfd)
 	    temp = temp->next;
+    return 1;
+}
+
+//delete peer with given peer socket file descriptor(peer_sockfd)
+int heard_peer(int peer_sockfd)
+{
+    tracker_peer_t* temp;
+    //search through peers linked_list for peer with peer_sockfd and update its last_time_stamp
+    for( temp = peer_head; temp != NULL; temp = temp->next )
+	if (temp->sockfd == peer_sockfd)
+	    temp->last_time_stamp = (unsigned long)time(NULL);   // peer's last_time_stamp
     return 1;
 }
 

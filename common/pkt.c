@@ -147,41 +147,45 @@ int tracker_sendpkt(int conn, file_t *ft)
     return 1;
 }
 
-// tracker recieves packet from peer
+// tracker recieves packet from peer and updates ptp_peer_t and file_table
 int tracker_recvpkt(int conn, ptp_peer_t *pkt, file_t *ft)
 {
     Node *temp;
     int file_table_size, counter;
 
-    //recieve first packet containing file_table_size 
-    if (recv(conn, pkt, sizeof(ptp_peer_t), 0)<0) {
+    //receive first packet containing file_table_size 
+    if ( recv(conn, pkt, sizeof(ptp_peer_t), 0) < 0 ) {
 	free(pkt);
 	return -1;
     }
-    
-    if(pkt->type == FILE_UPDATE) {
-	file_table_size = pkt->file_table_size;
-	free(pkt);
-    
+    //if packet of type FILE_UPDATE
+    if( pkt->type == FILE_UPDATE ) {
+	file_table_size = pkt->file_table_size;  //first packet contains no. of nodes in linked list
+	
+	// wait for recieving all the nodes from the
 	for ( counter=0; counter < file_table_size; counter++ ) {
 	    pkt = calloc(1, sizeof(ptp_peer_t));
 	    if ( recv(conn, pkt, sizeof(ptp_peer_t), 0) < 0 ) {
 		free(pkt);
 		return -1;
 	    }
-	    if( counter == 0 ) {
-		temp         = calloc(1, sizeof(Node));
-		*temp        = pkt->file;
-		ft->head     = temp;	    
+	    if(pkt->type == FILE_UPDATE) {
+		if( counter == 0 ) {
+		    temp         = calloc(1, sizeof(Node));
+		    *temp        = pkt->file;
+		    ft->head     = temp;	    
+		}
+		else {
+		    temp->pNext  = calloc(1, sizeof(Node));
+		    *temp->pNext = pkt->file;
+		    temp         = temp->pNext;
+		}
 	    }
+	    // if packet recieved not of type FILE_UPDATE
 	    else {
-		temp->pNext  = calloc(1, sizeof(Node));
-		*temp->pNext = pkt->file;
-		temp         = temp->pNext;
+		counter--;
 	    }
-	    free(pkt);
 	}
     }    
     return 0;
 }
-

@@ -19,6 +19,8 @@
 #include <netinet/in.h>
 #include <signal.h>
 #include <pthread.h>
+#include <sys/time.h>
+#include <time.h>
 
 #define PROTOCOL_LEN 100      // protocol name
 #define RESERVED_LEN 512
