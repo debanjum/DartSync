@@ -555,6 +555,5 @@ int main(int argc, const char * argv[]) {
 
         free(trackerFileTable);
     }
-    
     return 0;
 }
