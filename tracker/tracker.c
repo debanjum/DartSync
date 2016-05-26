@@ -5,35 +5,69 @@
 //  Created by Debanjum Singh Solanky on 05/20/16.
 //  Copyright © 2016 Debanjum Singh Solanky. All rights reserved.
 
+#define _DEFAULT_SOURCE              // refer: https://stackoverflow.com/questions/3355298/unistd-h-and-c99-on-linux + warning message
 #include "tracker.h"
 
-tracker_peer_t *peer_head = NULL;   //Peer List
-file_t *ft                = NULL;   //File Table
+tracker_peer_t *peer_head = NULL;   // Peer List
+file_t *ft                = NULL;   // File Table
 
 // main thread for handling communication with individual peers
 void* handshake(void* arg) {
     int connection = *(int *)arg;
     ptp_peer_t* recv_pkt = (ptp_peer_t *)calloc(1,sizeof(ptp_peer_t));
-    file_t *peer_ft = NULL;
     
-    while( tracker_recvpkt(connection, recv_pkt, peer_ft) > 0 ) {
+    int counter = -1, file_table_size = -1;
+    file_t *peer_ft;
+    Node *temp;
+    
+    while( tracker_recvpkt(connection, recv_pkt) > 0 ) {
 	
-	if(recv_pkt->type==REGISTER)
-	    tracker_sendpkt(connection, ft);      // send tracker file_table to peer as response
+	if( recv_pkt->type == REGISTER )
+	    tracker_sendpkt(connection, ft);                  // send tracker file_table to peer as response
 	
-	else if(recv_pkt->type==FILE_UPDATE) {
-	    update_filetable(peer_ft);            // update tracker file_table based on information from peer's file_table
-	    broadcast_filetable();                // send updated tracker file_table to all peers
+	else if( recv_pkt->type == FILE_UPDATE ) {
+
+	    // if tracker expects first FILE_UPDATE and peer sent first FILE_UPDATE packet 
+	    if( counter == -1 && recv_pkt->file_table_size != -1)  {
+		file_table_size = recv_pkt->file_table_size;        // first FILE_UPDATE packet contains only no. of nodes in linked list
+		peer_ft = calloc(1, sizeof(file_t));                // initialize peer_file table for receiving
+	    }
+
+	    // if tracker expects file Node and peer sent packet with file Node
+	    else if( ++counter < file_table_size && recv_pkt->file_table_size == -1 ) {
+		// if second FILE_UPDATE packet used to set linked list HEAD
+		if( counter == 0 ) {                          
+		    temp           = calloc(1, sizeof(Node));
+		    *temp          = recv_pkt->file;
+		    peer_ft->head  = temp;	    
+		}
+		else {
+		    temp->pNext    = calloc(1, sizeof(Node));
+		    *temp->pNext   = recv_pkt->file;
+		    temp           = temp->pNext;
+		}
+	    }
+	    
+	    // if received last file Node of peer's file_table
+	    if ( counter == (file_table_size-1) ) {
+		update_filetable(peer_ft);            // update tracker file_table based on information from peer's file_table
+		
+		counter = -1;                         // reset counter
+		file_table_size = -1;                 // reset file_table_size, to detect if tracker expects file Node in previous else if
+		free(peer_ft);                        // free peer file table
+
+		broadcast_filetable();                // send updated tracker file_table to all peers
+	    }
 	}
 	
-	else if(recv_pkt->type==KEEP_ALIVE) {     // if receive heartbeat message(KEEP_ALIVE)
-	    heard_peer(connection);               // update last_heard timestamp of peer with 'connection'
-	}
+	else if( recv_pkt->type == KEEP_ALIVE )       // if receive heartbeat message(KEEP_ALIVE)
+	    heard_peer(connection);                   // update last_heard timestamp of peer with 'connection'
     }
     
     free(recv_pkt);
     return 0;
 }
+
 
 // continuously check (every HEARTBEAT_INTERVAL) and remove peers not heard from in a while (= HEARTBEAT_TIMEOUT)
 void* heartbeat(void* arg) {
@@ -42,7 +76,7 @@ void* heartbeat(void* arg) {
     
     while(1) {
 	//traverse through peers linked_list for peer
-	for( temp = peer_head; temp != NULL; temp = temp->next )
+	for( temp = peer_head; temp != NULL; temp = temp->next ) 
 	    // when did we last hear from the peer ? if last heard from peer > HEARTBEAT_TIMEOUT
 	    if ( ((unsigned long)time(NULL) - temp->last_time_stamp)  > HEARTBEAT_TIMEOUT )
 		delete_peer(temp->sockfd);
@@ -52,12 +86,15 @@ void* heartbeat(void* arg) {
     return 0;
 }
 
+
 // send tracker filetable to all peer's in peers_list
 int broadcast_filetable() {
     tracker_peer_t* temp;
+    
     //search through peers linked_list for peer with peer_sockfd and delete it
     for( temp = peer_head; temp != NULL; temp = temp->next )
 	tracker_sendpkt(temp->sockfd, ft);
+    
     return 1;
 }
 
@@ -70,26 +107,33 @@ int update_filetable(file_t *peer_ft) {
     // traverse through each file in peer's file table
     for( peer_ftemp = peer_ft->head; peer_ftemp != NULL; peer_ftemp = peer_ftemp->pNext ) {
 	file_found = 0;
+	
 	// traverse through each file till before last in tracker's file table
 	for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
+	    
 	    // if found matching file entry between tracker and peer
 	    if (strcmp(tracker_ftemp->name, peer_ftemp->name)==0) {
+		
 		// UPDATE_FILE_PEERS: if matching file entry in tracker older than on peer, update tracker file_table entry
 		if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
 		    int peers  = sizeof(tracker_ftemp->newpeerip)/IP_LEN;                // find no. of peers in 'newpeerip' string array
 		    peer_found = 0;
-		    //check if peer exists in newpeerip list of peers with latest file version
+		    
+		    // check if peer exists in newpeerip list of peers with latest file version
 		    for( index=0; index<peers; index++)
 			if(strcmp(tracker_ftemp->newpeerip[index], peer_ftemp->newpeerip[0])==0) {
 			    peer_found=1;
 			    break;
 			}
-		    //if peer doesn't exist in newpeerip list of peers with latest file version
+		    
+		    // if peer doesn't exist in newpeerip list of peers with latest file version
 		    if(!peer_found)
-			strcpy(tracker_ftemp->newpeerip[peers], peer_ftemp->newpeerip[0]);  // append new peer to end of 'newpeerip' string array 
+			strcpy(tracker_ftemp->newpeerip[peers], peer_ftemp->newpeerip[0]);  // append new peer to end of 'newpeerip' string array
+		    
 		    file_found = 1;
 		    break;
 		}
+		
 		// UPDATE_FILE_VERSION : if matching file entry in tracker older than on peer, update tracker file_table entry
 		if(tracker_ftemp->timestamp < peer_ftemp->timestamp) {
 		    tracker_ftemp->size = peer_ftemp->size;
@@ -99,18 +143,21 @@ int update_filetable(file_t *peer_ft) {
 		    break;
 		}
 	    }
-	    //break while pointer still pointing to last element in file_table linked list. Allows appending later if required
+	    
+	    // break while pointer still pointing to last element in file_table linked list. Allows appending later if required
 	    if (tracker_ftemp->pNext == NULL)
 		break;
 	}
 	
 	// ADD_FILE: if no file with current file_name on peer found on tracker's file table, append the file to tracker's file table
 	if(!file_found) {
+	    
 	    //if file_list not empty, head!=NULL case
 	    if(tracker_ftemp) {
 		tracker_ftemp->pNext  = calloc(1, sizeof(Node));
 		tracker_ftemp         = tracker_ftemp->pNext;
 	    }
+	    
 	    //catches case of empty list, head==NULL case
 	    else
 		tracker_ftemp        = calloc(1, sizeof(Node));
@@ -124,6 +171,7 @@ int update_filetable(file_t *peer_ft) {
     }
     return 0;
 }
+
 
 // add peer to tracker_peer_t list
 int add_peer(int peer_sockfd, char ip[IP_LEN]) {
@@ -156,25 +204,31 @@ int add_peer(int peer_sockfd, char ip[IP_LEN]) {
 
 
 //delete peer with given peer socket file descriptor(peer_sockfd)
-int delete_peer(int peer_sockfd)
-{
+int delete_peer(int peer_sockfd) {
     tracker_peer_t* temp;
+    
     //search through peers linked_list for peer with peer_sockfd and delete it
     for( temp = peer_head; temp != NULL; temp = temp->next )
-	if (temp->sockfd == peer_sockfd)
+	if (temp->sockfd == peer_sockfd) {
 	    temp = temp->next;
-    return 1;
+	    return 1;
+	}
+    
+    return -1;
 }
 
-//delete peer with given peer socket file descriptor(peer_sockfd)
-int heard_peer(int peer_sockfd)
-{
+
+//heard heartbeat of peer with given peer socket file descriptor(peer_sockfd)
+int heard_peer(int peer_sockfd) {    
     tracker_peer_t* temp;
+    
     //search through peers linked_list for peer with peer_sockfd and update its last_time_stamp
     for( temp = peer_head; temp != NULL; temp = temp->next )
-	if (temp->sockfd == peer_sockfd)
+	if (temp->sockfd == peer_sockfd) {
 	    temp->last_time_stamp = (unsigned long)time(NULL);   // peer's last_time_stamp
-    return 1;
+	    return 1;
+	}
+    return -1;
 }
 
 
@@ -205,7 +259,6 @@ int main() {
     pthread_create(&heartbeat_thread, NULL, heartbeat, NULL);
 
     while((connection = accept(peer_sockfd, (struct sockaddr*)&peer_addr, &peer_addr_len))>0) {
-	
 	// Register peer in peer-list, [MAYBE] Ideally should be in handshake_thread, if peer sends pkt of type pkt->type=REGISTER
 	add_peer(peer_sockfd, inet_ntoa(peer_addr.sin_addr));
 	
@@ -213,4 +266,7 @@ int main() {
 	pthread_t handshake_thread;
 	pthread_create(&handshake_thread, NULL, handshake, (void*)&connection);
     }
+    
+    return 0;
 }
+

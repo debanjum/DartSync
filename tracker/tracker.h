@@ -19,11 +19,14 @@ typedef struct tracker_side_peer_t {
     struct tracker_side_peer_t *next;
 } tracker_peer_t;
 
-//delete peer with given peer socket file descriptor(peer_sockfd)
-int delete_peer(int peer_sockfd);
-
 // add peer to tracker_peer_t list
 int add_peer(int peer_sockfd, char ip[IP_LEN]);
+
+// update timestamp of peer with given peer socket file descriptor(peer_sockfd)
+int heard_peer(int peer_sockfd);
+
+//delete peer with given peer socket file descriptor(peer_sockfd)
+int delete_peer(int peer_sockfd);
 
 // update tracker filetable based on information from peer's filetable
 int update_filetable(file_t *peer_ft);

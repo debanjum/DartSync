@@ -35,7 +35,7 @@ typedef struct segment_tracker{
 } ptp_tracker_t;
 
 // Tracker receives packet from peer
-int tracker_recvpkt(int connection, ptp_peer_t *pkt, file_t *ft);
+int tracker_recvpkt(int connection, ptp_peer_t *pkt);
 
 // Tracker sends packet to peer with its current file table wrapped
 int tracker_sendpkt(int conn, file_t *ft);

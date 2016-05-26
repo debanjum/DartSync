@@ -3,8 +3,10 @@
 //  peer
 //
 //  Created by Lexin Tang on 5/18/16.
-//  Copyright Â© 2016 Lexin Tang. All rights reserved.
+//  Copyright © 2016 Lexin Tang. All rights reserved.
 //
+
+#define _DEFAULT_SOURCE              //refer: https://stackoverflow.com/questions/3355298/unistd-h-and-c99-on-linux + warning message
 #include "peer.h"
 
 int ptp_listen_fd, tracker_conn;
