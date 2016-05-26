@@ -542,7 +542,6 @@ int main(int argc, const char * argv[]) {
         }
 
         // free the table
-
         Node *ptr = trackerFileTable->head;
         // if the pointer does not point to NULL
         if (ptr != NULL) {
