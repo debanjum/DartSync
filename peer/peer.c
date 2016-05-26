@@ -308,12 +308,6 @@ void modify(download_arg_t *down) {
 // delete a node from our local file table to reflect changes in the global directory
 void delete(Node *find) {
 
-    // delete the file from the local directory first
-    int ret = remove(*current->name);
-    if (ret != 0) {
-        perror("Unable to delete the file");
-    }
-
     // get the head of the file table
     Node *current = file_table->head;
 
@@ -467,6 +461,13 @@ void compareNode(Node *seekNode) {
 
             // otherwise, we need to delete the file
             else {
+
+                // delete the file from the local directory first
+                int ret = remove(*current->name);
+                if (ret != 0) {
+                    perror("Unable to delete the file");
+                }
+                
                 delete(current);
             }
         }
