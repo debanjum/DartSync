@@ -16,7 +16,6 @@
 #include <sys/dirent.h>
 
 #include "../common/constant.h"
-#include "../common/list.h"
 #include "monitor.h"
 
 #define EVENT_SIZE  ( sizeof (struct inotify_event) )
