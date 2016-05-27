@@ -8,7 +8,7 @@
 
 #include "pkt.h"
 
-/*in_addr_t *getmyip() {
+char *getmyip() {
     
     char myhostname[100];
     gethostname(myhostname, 100);
@@ -22,8 +22,8 @@
     //ip address from hostname
     addr_list = *(in_addr_t **)node->h_addr_list;
 
-    return (in_addr_t *)addr_list;
-    }*/
+    return inet_ntoa(*(struct in_addr *)addr_list);
+}
 
 
 // peer sends packet to tracker
@@ -36,8 +36,10 @@ int peer_sendpkt(int conn, file_t *ft, int type){
     send_pkt->type            = type;
     send_pkt->port            = P2P_PORT;
     send_pkt->file_table_size = -1;
-    //[TODO]add peer ip to pkt struct
-
+    strcpy(send_pkt->peer_ip, getmyip()); // set my(peer) IP
+    
+    printf(" from %s ", send_pkt->peer_ip);
+    
     if( type == FILE_UPDATE ) {
 	//find no. of files in file_table
 	for( ftemp = ft->head; ftemp != NULL; ftemp = ftemp->pNext, file_count++ ){};
@@ -55,7 +57,7 @@ int peer_sendpkt(int conn, file_t *ft, int type){
     if( type == FILE_UPDATE ) {
 	// pack and send each of the nodes in the file table one by one to tracker
 	for( ftemp = ft->head; ftemp != NULL; ftemp = ftemp->pNext ){
-	    ptp_peer_t *send_pkt   = (ptp_peer_t *)calloc(1, sizeof(ptp_peer_t));
+	    ptp_peer_t *send_pkt      = (ptp_peer_t *)calloc(1, sizeof(ptp_peer_t));
 	    send_pkt->file            = *ftemp;
 	    send_pkt->file_table_size = -1;
 	    send_pkt->type            = type;
@@ -88,7 +90,7 @@ int peer_recvpkt(int conn, file_t *ft){
     }
     file_table_size = pkt->file_table_size;
     free(pkt);
-    
+    printf("received file_table of size: %d\n", file_table_size);
     for ( counter=0; counter < file_table_size; counter++ ) {
 	pkt = calloc(1, sizeof(ptp_tracker_t));
 	if ( recv(conn, pkt, sizeof(ptp_tracker_t), 0) < 0 ) {
@@ -98,12 +100,14 @@ int peer_recvpkt(int conn, file_t *ft){
 	if( counter == 0 ) {
 	    temp        = calloc(1, sizeof(Node));
 	    *temp        = pkt->file;
-	    ft->head    = temp;	    
+	    ft->head    = temp;
+	    printf("received file_table head\n");
 	}
 	else {
 	    temp->pNext = calloc(1, sizeof(Node));
 	    *temp->pNext = pkt->file;
 	    temp        = temp->pNext;
+	    printf("received file_table node: %d\n", counter);
 	}
 	free(pkt);
     }

@@ -6,15 +6,6 @@
 //  Copyright © 2016 Lexin Tang. All rights reserved.
 //
 
-#define _DEFAULT_SOURCE              // refer: https://stackoverflow.com/questions/3355298/unistd-h-and-c99-on-linux + warning message
-
-#include <stdio.h>
-#include <string.h>
-#include <sys/time.h>
-#include <time.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include "peer.h"
 
 int ptp_listen_fd, tracker_conn;
@@ -398,27 +389,41 @@ void peer_stop(){
 // this function is used to start connection to tracker, send REGISTER pkt and wait for ACCEPT pkt.
 int connect_to_tracker(){
     int sockfd;
+    // create socket for peer-tracker communications
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 6)) == -1) {
         perror("socket creation error\n");
         return -1;
     }
-    
+
+    // connect to tracker
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(HANDSHAKE_PORT);
     server_addr.sin_addr.s_addr = inet_addr(TRACKER_IP);  // IP address of tracker
-    
+
+    printf("connect to tracker");
     if ((connect(sockfd, (struct sockaddr *)&(server_addr), sizeof(struct sockaddr))) == -1) {
-        perror("connect error\n");
-        return -1;
+        printf("...fail\n");
+	return -1;
     }
-    
+    printf("...pass\n");
+
     // send a REGISTER pkt
-    peer_sendpkt(sockfd, file_table, REGISTER);
+    printf("send REGISTER packet to tracker");
+    if( peer_sendpkt(sockfd, file_table, REGISTER) < 0 ) {
+	printf("...fail\n");
+	return -1;
+    }
+    printf("...pass\n");
     
     // wait for ACCEPT pkt from tracker
-    peer_recvpkt(sockfd, file_table);
+    printf("accept FILE_TABLE in tracker response");
+    if( peer_recvpkt(sockfd, file_table) < 0 ) {
+	printf("...fail\n");
+	return -1;
+    }
+    printf("...pass\n");
     
     return sockfd;
 }
@@ -514,6 +519,10 @@ int main(int argc, const char * argv[]) {
     
     // connect to tracker, register and accept
     tracker_conn = connect_to_tracker();
+    if(tracker_conn < 0) {
+	perror("connect_to_tracker");
+	return -1;
+    }
     printf("Peer: successfully connect to tracker!\n");
     
     // initialize listen_to_peer thread

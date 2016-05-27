@@ -9,6 +9,8 @@
 #ifndef common_h
 #define common_h
 
+#define _DEFAULT_SOURCE              // refer: https://stackoverflow.com/questions/3355298/unistd-h-and-c99-on-linux + warning message
+
 #include "stdio.h"
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -21,6 +23,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <time.h>
+#include <netdb.h>
 
 #define PROTOCOL_LEN 100      // protocol name
 #define RESERVED_LEN 512

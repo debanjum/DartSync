@@ -5,7 +5,6 @@
 //  Created by Debanjum Singh Solanky on 05/20/16.
 //  Copyright © 2016 Debanjum Singh Solanky. All rights reserved.
 
-#define _DEFAULT_SOURCE              // refer: https://stackoverflow.com/questions/3355298/unistd-h-and-c99-on-linux + warning message
 #include "tracker.h"
 
 tracker_peer_t *peer_head = NULL;   // Peer List
@@ -21,7 +20,7 @@ void* handshake(void* arg) {
     Node *temp;
     
     while( tracker_recvpkt(connection, recv_pkt) > 0 ) {
-	
+	printf("~>tracker: received packet from %s of type %d", recv_pkt->peer_ip, recv_pkt->type);
 	if( recv_pkt->type == REGISTER )
 	    tracker_sendpkt(connection, ft);                  // send tracker file_table to peer as response
 	
@@ -253,12 +252,13 @@ int main() {
     if(listen(peer_sockfd, 1) < 0)
 	return -1;
     
-    printf("waiting for connection\n");
+    printf("listening on %d for peer connections", HANDSHAKE_PORT);
 
     pthread_t heartbeat_thread;
     pthread_create(&heartbeat_thread, NULL, heartbeat, NULL);
 
     while((connection = accept(peer_sockfd, (struct sockaddr*)&peer_addr, &peer_addr_len))>0) {
+	printf("accepted connection from %s\n", inet_ntoa(peer_addr.sin_addr));
 	// Register peer in peer-list, [MAYBE] Ideally should be in handshake_thread, if peer sends pkt of type pkt->type=REGISTER
 	add_peer(peer_sockfd, inet_ntoa(peer_addr.sin_addr));
 	
