@@ -1,6 +1,9 @@
 !.gitignore
 .archive
+*.o
 TAGS
+tracker/tracker
+peer/peer
 # Editor Backup Files
 *~
 .\#*
