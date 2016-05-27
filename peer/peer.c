@@ -5,6 +5,9 @@
 //  Created by Lexin Tang on 5/18/16.
 //  Copyright © 2016 Lexin Tang. All rights reserved.
 //
+
+#define _DEFAULT_SOURCE              // refer: https://stackoverflow.com/questions/3355298/unistd-h-and-c99-on-linux + warning message
+
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
