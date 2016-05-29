@@ -46,4 +46,5 @@ int peer_sendpkt(int conn, file_t *ft, int type);
 // Peer receives packet from tracker and unpacks trackers file table 
 int peer_recvpkt(int conn, file_t *ft);
 
+char *getmyip();
 #endif // pkt_h

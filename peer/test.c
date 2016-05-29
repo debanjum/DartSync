@@ -9,8 +9,15 @@
 #include "peer.h"
 int ptp_listen_fd;
 
-// each peer listening at P2P_PORT
+int main(int argc, const char * argv[]){
+    readConfigFile();
+    watchDirectory();
+    
+    return 0;
+}
 
+/*
+// test p2p file transfer, each peer listening at P2P_PORT
 int main(int argc, const char * argv[]){
     // ptp_listen_thread_init()
     
@@ -22,7 +29,6 @@ int main(int argc, const char * argv[]){
     
     struct sockaddr_in server_addr;
     
-    /* Prepare the socket address structure of the server */
     server_addr.sin_family = AF_INET;       // host byte order
     server_addr.sin_port = htons(P2P_PORT);   // short, network byte order
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY); // automatically fill with my IP address "localhost"
@@ -42,13 +48,12 @@ int main(int argc, const char * argv[]){
     pthread_create(&ptp_listening_thread, NULL, ptp_listening, (void*)0);
     
     // specify a file to be transfered, downloading a file from a remote peer
-    
-    //
+ 
     download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
     
     strcpy(download_arg->filename, "send_this_text.txt");
     // address list of available peers
-    /*
+ 
     FILE *f = fopen("send_this_text.txt", "r");
     if (f == NULL){
         printf("cannot open file!\n");
@@ -57,13 +62,14 @@ int main(int argc, const char * argv[]){
     download_arg->size = (unsigned long)ftell(f);
     printf("file size = %lu", download_arg->size);
     fclose(f);
-     */
+ 
     download_arg->size = 37170;
     download_arg->peerNum = 3;
     
     for (int i = 0; i < MAX_PEER_NUM; i++){
         memset(&download_arg->addr_list[i], 0, sizeof(struct sockaddr_in));
     }
+ 
     download_arg->addr_list[0].sin_family = AF_INET;
     download_arg->addr_list[0].sin_addr.s_addr = inet_addr("129.170.214.100");  // carter
     download_arg->addr_list[0].sin_port = htons(P2P_PORT);
@@ -81,3 +87,5 @@ int main(int argc, const char * argv[]){
     pthread_join(ptp_download_thread, NULL);
     return 0;
 }
+*/
+

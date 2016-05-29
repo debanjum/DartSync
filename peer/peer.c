@@ -252,6 +252,9 @@ void* ptp_download(void* arg){
 // file_monitor thread monitors a local file directory
 // it sends out updated file table to tracker if any file changes in the local file directory.
 void* file_monitor(void* arg){
+    readConfigFile("config.data");
+    watchDirectory(file_table);
+    
     return 0;
 }
 

@@ -24,6 +24,8 @@
 #include <sys/time.h>
 #include <time.h>
 #include <netdb.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #define PROTOCOL_LEN 100      // protocol name
 #define RESERVED_LEN 512
@@ -82,6 +84,5 @@ typedef struct node{
 typedef struct file_table {
     Node * head;
 } file_t;
-
 
 #endif /* common_h */

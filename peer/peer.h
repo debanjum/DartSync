@@ -11,6 +11,7 @@
 
 #include "../common/pkt.h"
 #include "p2p.h"
+#include "monitor.h"
 
 /* Peer-side peer table */
 typedef struct _peer_side_peer_t {

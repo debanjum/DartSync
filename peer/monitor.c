@@ -1,54 +1,11 @@
-//
-// Created by Amir on 5/19/2016.
-//
-
-#include <stdlib.h>
-#include <unistd.h>
-#include <ftw.h>
-#include <time.h>
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
-
-#include <sys/types.h>
-#include <sys/inotify.h>
-#include <strings.h>
-#include <sys/dirent.h>
-
-#include "../common/constant.h"
 #include "monitor.h"
 
-#define EVENT_SIZE  ( sizeof (struct inotify_event) )
-#define BUF_LEN     ( 1024 * ( EVENT_SIZE + 16 ) )
+char sync_dir[FILE_NAME_LEN];   // sync_dir
+DirTree *dir_tree;
+int dirNum;
+file_t *filetable;
 
-#ifndef USE_FDS
-#define USE_FDS 15
-#endif
-
-char *DIR_PATH;
-
-PathList *pathList;
-
-FileList *fileList;
-
-//Node *localNode;
-
-file_t *tableNode;
-
-char current_path[200];
-
-void substring(char s[], char sub[], size_t p, size_t l) {
-    size_t c = 0;
-
-    while (c < l) {
-        sub[c] = s[p + c - 1];
-        c++;
-    }
-    sub[c] = '\0';
-
-    printf("%s\n", sub);
-}
-
+// this function is used to detect if str is ended with suffix
 int endsWith(const char *str, const char *suffix) {
     if (!str || !suffix)
         return 0;
@@ -59,529 +16,464 @@ int endsWith(const char *str, const char *suffix) {
     return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
 
+/*
+ Node *lookupNode(char *filename) {
+ char abspath[FILE_NAME_LEN];
+ strcpy(abspath, sync_dir);
+ strcat(abspath, filename);
+ 
+ Node *myNode = NULL;
+ if (tableNode->head != NULL) {
+ PointerNode *pointerNode = tableNode->head;
+ while (pointerNode) {
+ 
+ myNode = pointerNode->node;
+ char *name = myNode->name;
+ char *fullpath = myNode->absolutePath;
+ 
+ if (strcmp(name, filename) == 0 && strcmp(abspath, fullpath) == 0)
+ return myNode;
+ 
+ pointerNode = pointerNode->next;
+ }
+ }
+ 
+ return myNode;
+ }
+ */
+
+// read sync_dir from config file
 int readConfigFile(char *filename) {
-    char cfg[200];
-    FILE *file = fopen(filename, "rb");
-
-    if (file) {
-        if (fgets(cfg, 200, file) == NULL) {
-            fclose(file);
-            return 0;
-        }
-        fclose(file);
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL){
+        printf("cannot open config file %s!\n", filename);
+        return -1;
     }
-    else {
-        return 0;
+    
+    char line[FILE_NAME_LEN];
+    fgets(line, sizeof(line), fp);
+    
+    // check the tail of dir
+    if (line[strlen(line) - 1] != '/'){
+        strcat(line, "/");
     }
-
-    if (strlen(cfg) == 0)
-        return 0;
-
-    struct stat st;
-    int err = stat(cfg, &st);
-
-    if (err == -1) {
-
-        if (ENOENT == errno) {
-            printf("%s does not exist.\n", cfg);
-        } else {
-            perror("stat");
-            return 0;
-        }
+    strcpy(sync_dir, line);
+    printf("sync_dir = %s read from config.data\n", sync_dir);
+    
+    // check if the dir exists, if not, create a new folder
+    struct stat st = {0};
+    if (stat(line, &st) == -1) {
+        printf("%s does not exist!\n", line);
+        printf("creating a new folder %s...\n", line);
+        mkdir(line, 0700);
     }
-    else {
-        if (S_ISDIR(st.st_mode)) {
-            size_t urlLen = strlen(cfg);
-            if (cfg[urlLen - 1] != '/')
-                strcat(cfg, "/");
-
-            strcpy(current_path, cfg);
-            return 1;
-        }
+    else{
+        printf("%s exists.\n", line);
     }
+    
     return 0;
 }
 
+// print out dir tree
+void printDirTree(DirTree *dirTree) {
+    printf("number of nodes in dir tree = %d\n", dirNum);
+    DirNode *node = dirTree->head;
+    int cnt = 1;
+    while (node != NULL) {
+        printf("%d node in dir tree: %s\n", cnt, node->dirpath);
+        node = node->next;
+        cnt++;
+    }
+}
+
+// add a subdir to dir tree
+void addDirNode(DirTree *dirTree, const char *dirpath) {
+    DirNode *node = (DirNode *)malloc(sizeof(DirNode));
+    strcpy(node->dirpath, dirpath);
+    strcat(node->dirpath, "/");
+    node->next = NULL;
+    
+    if (dirNum == 0){   // dirTree is empty
+        dir_tree->head = node;
+        dir_tree->tail = node;
+    }
+    else{
+        dirTree->tail->next = node;
+        dirTree->tail = node;
+    }
+    //printf("%d node in dir tree : %s\n", dirNum, node->dirpath);
+    dirNum++;
+    printDirTree(dirTree);
+}
+
+// delete a subdir from dir tree
+int deleteDirNode(DirTree *dirTree, const char *dirpath) {
+    // look up this dirpath in dirTree
+    DirNode *prev = NULL;
+    DirNode *node = dirTree->head;
+    
+    while (node != NULL){
+        if (strstr(node->dirpath, dirpath) != NULL){
+            prev->next = node->next;
+            free(node);
+            dirNum--;
+            if (node == dirTree->tail){ // tail is deleted
+                dirTree->tail = prev;
+            }
+            printDirTree(dirTree);
+            return 0;
+        }
+        prev = node;
+        node = node->next;
+    }
+    return -1;
+}
+
+// print each subdirectory
 int print_entry(const char *filepath, const struct stat *info,
                 const int typeflag, struct FTW *pathinfo) {
-    if (typeflag == FTW_SL) {
-        char *target;
-        size_t maxlen = 1023;
-        ssize_t len;
-
-        while (1) {
-
-            target = malloc(maxlen + 1);
-            if (target == NULL)
-                return ENOMEM;
-
-            len = readlink(filepath, target, maxlen);
-            if (len == (ssize_t) -1) {
-                const int saved_errno = errno;
-                free(target);
-                return saved_errno;
-            }
-            if (len >= (ssize_t) maxlen) {
-                free(target);
-                maxlen += 1024;
-                continue;
-            }
-
-            target[len] = '\0';
-            break;
-        }
-
-        free(target);
-
+    // filepath is a directory, add it to the directory tree
+    if (typeflag == FTW_D || typeflag == FTW_DP){
+        addDirNode(dir_tree, filepath);
     }
-    if (typeflag == FTW_D || typeflag == FTW_DP)
-        appendPath(pathList, strdup(filepath));
-
     return 0;
 }
 
-
-int print_directory_tree(const char *const dirpath) {
+// this function is used for recursively traversing directories.
+int print_directory_tree(const char *dirpath) {
+    // initialize directory tree
+    dir_tree = (DirTree *) malloc(sizeof(DirTree));
+    dirNum = 0;
+    
+    // file tree walk
     int result;
-
-    if (dirpath == NULL || *dirpath == '\0')
-        return errno = EINVAL;
-
     result = nftw(dirpath, print_entry, USE_FDS, FTW_PHYS);
     if (result >= 0)
         errno = result;
-
+    
     return errno;
 }
 
-Node *lookupNode(char *filename) {
-
-    char abspath[100];
-    strcpy(abspath, current_path);
-    strcat(abspath, filename);
-
-    Node *myNode = NULL;
-    if (tableNode->head != NULL) {
-        PointerNode *pointerNode = tableNode->head;
-        while (pointerNode) {
-
-            myNode = pointerNode->node;
-            char *name = myNode->name;
-            char *fullpath = myNode->absolutePath;
-
-            if (strcmp(name, filename) == 0 && strcmp(abspath, fullpath) == 0)
-                return myNode;
-
-            pointerNode = pointerNode->next;
-        }
-    }
-
-    return myNode;
-}
-
-void appendPath(PathList *pathList, char *path) {
-    struct DirPathNode *node = (struct DirPathNode *) malloc(sizeof *node);
-    node->path = path;
-    node->next = NULL;
-
-    if (pathList->tail == NULL) {
-        pathList->tail = node;
-        pathList->head = node;
-        node->next = NULL;
-        node->prev = NULL;
-        dirNum++;
-        return;
-    }
-    node->prev = pathList->tail;
-    node->next = NULL;
-    pathList->tail->next = node;
-    pathList->tail = node;
-    dirNum++;
-}
-
-char *PopPathList(PathList *pathList) {
-    char *path = NULL;
-    if (pathList->head != NULL) {
-        DirPathNode *node = pathList->head;
-        if (pathList->head->next != NULL) {
-            pathList->head = pathList->head->next;
-            pathList->head->prev = NULL;
-        }
-        else {
-            pathList->head = NULL;
-            pathList->tail = NULL;
-        }
-        path = node->path;
-        dirNum--;
-    }
-    return path;
-}
-
-int dirNumbers() {
-    return dirNum;
-}
-
-int fileAdded(char *filename) {
-
-    char abspath[100];
-    strcpy(abspath, current_path);
-    strcat(abspath, filename);
-
-    struct stat statbuf;
-    Node *node = malloc(sizeof(Node));
-    node->name = filename;
-    node->absolutePath = abspath;
-    node->type = FILE_CREATE;
-
-    if (stat(abspath, &statbuf) != -1) {
-        long fileSize = statbuf.st_size;
-        node->size = fileSize;
-        node->timestamp = (unsigned long) (statbuf.st_mtime);
-        node->status = IS_FILE;
-    }
-
-    struct PointerNode *pointerNode = (struct PointerNode *) malloc(sizeof *pointerNode);
-    pointerNode->node = node;
-    pointerNode->next = NULL;
-
-    if (tableNode->tail == NULL) {
-        tableNode->tail = pointerNode;
-        tableNode->head = pointerNode;
-        pointerNode->next = NULL;
-        pointerNode->prev = NULL;
-        return 0;
-    }
-    pointerNode->prev = tableNode->tail;
-    pointerNode->next = NULL;
-    tableNode->tail->next = pointerNode;
-    tableNode->tail = pointerNode;
-
-    return 1;
-}
-
-FileInfo *getFileInfo(char *filename) {
-    if (filename == NULL || strlen(filename) == 0 || current_path == NULL || strlen(current_path) == 0)
+// this function is used to extract file attributes: size and timestamp
+FileInfo *getFileInfo(char *filepath) {
+    if (filepath == NULL || strlen(filepath) == 0)
         return NULL;
-
-    char abspath[100];
-    strcpy(abspath, current_path);
-    strcat(abspath, filename);
-
+    
     FileInfo *fileInfo = NULL;
-
     struct stat statbuf;
-    if (stat(abspath, &statbuf) != -1) {
-        fileInfo = malloc(sizeof(FileInfo));
+    if (stat(filepath, &statbuf) != -1) {
+        fileInfo = (FileInfo *)malloc(sizeof(FileInfo));
         long fileSize = statbuf.st_size;
-
+        
         fileInfo->size = fileSize;
-        fileInfo->timestamp = (unsigned long int) (statbuf.st_mtime);
-
-        fileInfo->filepath, abspath;
+        fileInfo->lastModifyTime = (unsigned long int) (statbuf.st_mtime);
+        
+        strcpy(fileInfo->filepath, &filepath[strlen(sync_dir)]); //filepath excluding the root sync folder
+        //printf("fileInfo->filepath = %s\n", fileInfo->filepath);
+        //printf("fileInfo->size = %lu\n", fileInfo->size);
+        //printf("fileInfo->lastModifyTime = %lu\n", fileInfo->lastModifyTime);
     }
-
+    
     return fileInfo;
 }
 
-void addFileToList(FileList *fileList, FileInfo *fileInfo) {
-    struct FileInfoNode *node = (struct FileInfoNode *) malloc(sizeof *node);
-    node->info = fileInfo;
-    node->next = NULL;
-
-    if (fileList->tail == NULL) {
-        fileList->tail = node;
-        fileList->head = node;
-        node->next = NULL;
-        node->prev = NULL;
-        return;
-    }
-    node->prev = fileList->tail;
-    node->next = NULL;
-    fileList->tail->next = node;
-    fileList->tail = node;
-
-}
-
-FileList *getAllFilesInfo() {
-    fileList = malloc(sizeof(FileList));
-    DIR *dir;
-
-    dir = opendir(current_path);
-    if (dir == NULL)
-        return NULL;
-
-    struct dirent *ent;
-
-    while ((ent = readdir(dir)) != NULL) {
-        char *fileName = ent->d_name;
-
-        FileInfo *fileInfo = getFileInfo(fileName);
-        if (fileInfo == NULL)
-            continue;
-
-        addFileToList(fileList, fileInfo);
-    }
-
-    return fileList;
-}
-
-int fileModified(char *filename) {
-
-    Node *myNode = lookupNode(filename);
-    if (myNode == NULL)
-        return 0;
-
-    FileInfo *fileInfo = getFileInfo(filename);
-    if (fileInfo == NULL)
-        return 0;
-
-    myNode->timestamp = fileInfo->timestamp;
-    myNode->size = fileInfo->size;
-
-    char abspath[100];
-    strcpy(abspath, current_path);
-    strcat(abspath, filename);
-
-    Node *tempNode = NULL;
-    if (tableNode->head != NULL) {
-        PointerNode *pointerNode = tableNode->head;
-        while (pointerNode) {
-
-            tempNode = pointerNode->node;
-            char *name = tempNode->name;
-            char *fullpath = tempNode->absolutePath;
-
-            if (strcmp(name, filename) == 0 && strcmp(abspath, fullpath) == 0) {
-                pointerNode->node = myNode;
-                return 1;
-            }
-            pointerNode = pointerNode->next;
+int fileAdded(char *filepath) {
+    FileInfo *fileInfo = getFileInfo(filepath);
+    Node *node = filetable->head;
+    Node *prev = NULL;
+    
+    // loop up this node in filetable
+    while (node != NULL){
+        if (strcmp(node->name, fileInfo->filepath) == 0){
+            printf("%s already exists in filetable!\n", node->name);
+            print_filetable();
+            return 0;
         }
+        prev = node;
+        node = node->pNext;
     }
+    
+    // add this node to filetable
+    Node *filenode = (Node *)malloc(sizeof(Node));
+    filenode->status = IS_FILE;
+    filenode->name = (char *)malloc(FILE_NAME_LEN);
+    strcpy(filenode->name, fileInfo->filepath);
+    filenode->size = fileInfo->size;
+    filenode->timestamp = fileInfo->lastModifyTime;
+    filenode->pNext = NULL;
+    for (int i = 0; i < MAX_PEER_NUM; i++){
+        memset(filenode->newpeerip[i], 0, sizeof(IP_LEN +1));
+    }
+    strcpy(filenode->newpeerip[0], getmyip());  // only store the peer's ip
+    
+    if (prev == NULL){
+        filetable->head = filenode;
+    }
+    else {
+        prev->pNext = filenode;
+    }
+    
+    print_filetable();
     return 0;
 }
 
-int fileDeleted(char *filename) {
-
-    char abspath[100];
-    strcpy(abspath, current_path);
-    strcat(abspath, filename);
-
-    Node *myNode = NULL;
-    if (tableNode->head != NULL) {
-        PointerNode *pointerNode = tableNode->head;
-        while (pointerNode->next) {
-
-            myNode = pointerNode->node;
-            char *name = myNode->name;
-            char *fullpath = myNode->absolutePath;
-
-            if (strcmp(name, filename) == 0 && strcmp(abspath, fullpath) == 0) {
-                if (tableNode->head->next != NULL) {
-                    tableNode->head = tableNode->head->next;
-                    tableNode->head->prev = NULL;
-                    return 1;
-                }
-                else {
-                    tableNode->head = NULL;
-                    tableNode->tail = NULL;
-                    return 0;
-                }
+int fileDeleted(char *filepath) {
+    FileInfo *fileInfo = getFileInfo(filepath);
+    Node *node = filetable->head;
+    Node *prev = NULL;
+    
+    // loop up this node in filetable
+    while (node != NULL){
+        if (strcmp(node->name, fileInfo->filepath) == 0){
+            if (filetable->head == node) {
+                filetable->head = node->pNext;
             }
-
-            pointerNode = pointerNode->next;
-        }
-        if (pointerNode->node != NULL) {
-            myNode = pointerNode->node;
-            char *name = myNode->name;
-            char *fullpath = myNode->absolutePath;
-
-            if (strcmp(name, filename) == 0 && strcmp(abspath, fullpath) == 0) {
-                if (tableNode->head->next != NULL) {
-                    tableNode->head = tableNode->head->next;
-                    tableNode->head->prev = NULL;
-                    return 1;
-                }
-                else {
-                    tableNode->head = NULL;
-                    tableNode->tail = NULL;
-                    return 0;
-                }
+            else {
+                prev->pNext = node->pNext;
             }
+            free(node);
+            print_filetable();
+            return 0;
         }
+        prev = node;
+        node = node->pNext;
     }
-    return 0;
+    print_filetable();
+    printf("cannot find %s in filetable\n", fileInfo->filepath);
+    return -1;
 }
 
-int notify(PathList *pathList) {
-    int length, i = 0;
+int fileModified(char *filepath) {
+    FileInfo *fileInfo = getFileInfo(filepath);
+    Node *node = filetable->head;
+    
+    // loop up this node in filetable
+    while (node != NULL){
+        if (strcmp(node->name, fileInfo->filepath) == 0) {
+            node->size = fileInfo->size;
+            node->timestamp = fileInfo->lastModifyTime;
+            print_filetable();
+            return 0;
+        }
+        node = node->pNext;
+    }
+    print_filetable();
+    printf("cannot find %s in filetable\n", fileInfo->filepath);
+    return -1;
+}
+
+
+void print_filetable(){
+    Node *node = filetable->head;
+    int cnt = 0;
+    printf("printing filetable...\n");
+    while (node != NULL){
+        printf("%d node filename = %s\n", cnt, node->name);
+        printf("%d node size = %lu\n", cnt, node->size);
+        printf("%d node lastModifyTime = %lu\n", cnt, node->timestamp);
+        printf("%d node peer ip = %s\n", cnt, node->newpeerip[0]);
+        node = node->pNext;
+        cnt++;
+    }
+}
+
+int notify(DirTree *dirTree) {
+    int length = 0;
     int fd;
-    int wd[dirNum + 1];
+    int wd[MAX_SUBDIR_NUM]; // max num of directories being watched
     char buffer[BUF_LEN];
-
-    char *folderArray[dirNum];
-
+    
+    char *folderArray[MAX_SUBDIR_NUM];
+    for (int i = 0; i < MAX_SUBDIR_NUM; i++){
+        folderArray[i] = NULL;
+    }
     fd = inotify_init();
-
     if (fd < 0) {
         perror("inotify_init");
     }
-
-    char *path;
-
+    
+    // add all directories in dir tree to *inotify_add_watch*
     int count = 0;
-    while ((path = PopPathList(pathList)) != NULL) {
-        printf("%s\n", path);
+    DirNode *dirNode = dirTree->head;
+    char *path;
+    while (dirNode != NULL) {
+        path = dirNode->dirpath;
+        printf("adding dir %s to inotify_add_watch()\n", path);
         folderArray[count] = path;
         wd[count++] = inotify_add_watch(fd, path,
                                         IN_OPEN | IN_MODIFY | IN_CREATE | IN_DELETE | IN_DELETE_SELF | IN_MOVED_TO |
                                         IN_MOVED_FROM);
+        dirNode = dirNode->next;
     }
-
-
+    
+    // keep watching
     while (1) {
         struct inotify_event *event;
-
+        
         length = read(fd, buffer, BUF_LEN);
-
+        
         if (length < 0) {
             perror("read");
         }
-
-        event = (struct inotify_event *) &buffer[i];
-
-        if (event->len) {
-
-            char abspath[200];
-            sprintf(abspath, "%s/%s", folderArray[(event->wd) - 1], event->name);
-            struct stat statbuf;
-
-            if (event->mask & IN_CREATE) {
-                char *eventName = event->name;
-                //     if (!(localNode->type == FILE_OPEN && strcmp(eventName, localNode->name) == 0)) {
-                if (strcmp(eventName, "4913") != 0 &&
-                    !(eventName[0] == '.' && (endsWith(eventName, ".swp") || endsWith(eventName, ".swpx")))
-                        ) {
-
-                    if (event->mask & IN_ISDIR) {
-                        printf("The directory %s was created.\n", event->name);
-                    }
-                    else {
-                        if (stat(abspath, &statbuf) != -1) {
-                            printf("The file %s was created.\n", event->name);
-                            fileAdded(eventName);
-                            if (strcmp(eventName, "ccc") == 0) {
-                                Node *nd = lookupNode(eventName);
-                                printf("name %s\n", nd->name);
+        
+        char *event_pnt;
+        for (event_pnt = buffer; event_pnt < buffer + length;){
+            event = (struct inotify_event *) event_pnt;
+            
+            if (event->len) {
+                
+                char abspath[FILE_NAME_LEN];
+                sprintf(abspath, "%s%s", folderArray[(event->wd) - 1], event->name);
+                //printf("absolute path of file %s is %s\n", event->name, abspath);
+                struct stat statbuf;
+                
+                if (event->mask & IN_CREATE) {
+                    char *eventName = event->name;
+                    //     if (!(localNode->type == FILE_OPEN && strcmp(eventName, localNode->name) == 0)) {
+                    if (strcmp(eventName, "4913") != 0 &&
+                        !(eventName[0] == '.' )) { // filter out all hiden files
+                        
+                        if (event->mask & IN_ISDIR) {
+                            printf("The directory %s was created.\n", event->name);
+                            // add this new directory to dir tree
+                            addDirNode(dirTree, abspath);
+                            printf("adding dir %s to inotify_add_watch()\n", abspath);
+                            folderArray[count] = abspath;
+                            wd[count++] = inotify_add_watch(fd, abspath,
+                                                            IN_OPEN | IN_MODIFY | IN_CREATE | IN_DELETE | IN_DELETE_SELF | IN_MOVED_TO |
+                                                            IN_MOVED_FROM);
+                            
+                        }
+                        else {
+                            if (stat(abspath, &statbuf) != -1) {
+                                printf("The file %s was created.\n", event->name);
+                                fileAdded(abspath); // when add a file, should firstly check whether it exists
+                                if (strcmp(eventName, "ccc") == 0) {
+                                    //Node *nd = lookupNode(eventName);
+                                    printf("eventName = %s\n", eventName);
+                                    //printf("name %s\n", nd->name);
+                                }
                             }
                         }
-
                     }
+                    //    }
                 }
-                //    }
-            }
-            if (event->mask & IN_OPEN) {
-                char *eventName = event->name;
-
-                if (event->mask & IN_ISDIR) {
-                    printf("The directory %s was opened.\n", event->name);
-                }
-                else {
-                    if (stat(abspath, &statbuf) != -1) {
-
-                    }
-                    printf("The file %s was opened.\n", event->name);
-                }
-            }
-            else if (event->mask & IN_DELETE) {
-                char *eventName = event->name;
-                size_t l = strlen(eventName);
-                if (eventName[l - 1] != '~' &&
-                    strcmp(eventName, "4913") != 0 &&
-                    !(eventName[0] == '.' && (endsWith(eventName, ".swp") ||
-                                              endsWith(eventName, ".swpx")))) {
-
-                    if (event->mask & IN_ISDIR) {
-                        printf("The directory %s was deleted.\n", event->name);
-                    }
-                    else {
-                        if (stat(abspath, &statbuf) != -1) {
-                            fileDeleted(eventName);
+                
+                else if (event->mask & IN_OPEN) {
+                    char *eventName = event->name;
+                    if (strcmp(eventName, "4913") != 0 &&
+                        !(eventName[0] == '.')) { // filter out all hiden files
+                        
+                        if (event->mask & IN_ISDIR) {
+                            //printf("The directory %s was opened.\n", event->name);
                         }
-                        printf("The file %s was deleted.\n", event->name);
-                    }
-                }
-                else if (eventName[l - 1] == '~') {
-
-                    size_t sz = strlen(event->name);
-                    char ptr[sz];
-                    char sub[sz - 1];
-                    strcpy(ptr, event->name);
-
-                    int j;
-                    for (j = 0; j < (int) (sz - 1); j++)
-                        sub[j] = ptr[j];
-                    sub[sz - 1] = '\0';
-
-                    if (event->mask & IN_ISDIR) {
-                        printf("The directory %s was modified.\n", sub);
-                    }
-                    else {
-                        if (stat(abspath, &statbuf) != -1) {
-                            fileModified(eventName);
+                        else {
+                            if (stat(abspath, &statbuf) != -1) {
+                                printf("The file %s was opened.\n", event->name);
+                            }
                         }
-                        printf("The file %s was modified.\n", sub);
                     }
                 }
-            }
-
-            else if (event->mask & IN_MODIFY) {
-
-                char *eventName = event->name;
-                size_t l = strlen(eventName);
-
-                if (eventName[l - 1] != '~' &&
-                    !(eventName[0] == '.' && (endsWith(eventName, ".swp") || endsWith(eventName, ".swpx")))) {
-
-                    if (event->mask & IN_ISDIR) {
-                        printf("The directory %s modified.\n", event->name);
-                    }
-                    else {
-                        if (stat(abspath, &statbuf) != -1) {
-                            fileModified(eventName);
+                
+                else if (event->mask & IN_DELETE) {
+                    char *eventName = event->name;
+                    size_t l = strlen(eventName);
+                    if (eventName[l - 1] != '~' &&
+                        strcmp(eventName, "4913") != 0 &&
+                        !(eventName[0] == '.')) {
+                        
+                        if (event->mask & IN_ISDIR) {
+                            printf("The directory %s was deleted.\n", event->name);
+                            
+                            // remove this directory from dir tree
+                            deleteDirNode(dirTree, abspath);
+                            
+                            // update folderArray and remove this directory from watching
+                            for (int i = 0; i < MAX_SUBDIR_NUM; i++){
+                                if (folderArray[i] == NULL){
+                                    continue;
+                                }
+                                if (strstr(folderArray[i], abspath) != NULL){
+                                    printf("wd index = %d\n", i);
+                                    (void) inotify_rm_watch(fd, wd[i]);
+                                    folderArray[i] = NULL;
+                                    break;
+                                }
+                            }
                         }
-                        printf("The file %s modified.\n", event->name);
+                        else {
+                            if (stat(abspath, &statbuf) != -1) {
+                                fileDeleted(abspath);
+                            }
+                            printf("The file %s was deleted.\n", event->name);
+                        }
+                    }
+                    else if (eventName[l - 1] == '~') {
+                        //printf("delete deteted! %s is deleted\n", eventName);
+                        
+                        size_t sz = strlen(event->name);
+                        char ptr[sz];
+                        char sub[sz - 1];
+                        strcpy(ptr, event->name);
+                        
+                        int j;
+                        for (j = 0; j < (int) (sz - 1); j++)
+                            sub[j] = ptr[j];
+                        sub[sz - 1] = '\0';
+                        
+                        if (event->mask & IN_ISDIR) {
+                            printf("The directory %s was modified.\n", sub);
+                        }
+                        else {
+                            if (stat(abspath, &statbuf) != -1) {
+                                //fileModified(abspath);
+                            }
+                            //printf("The file %s was modified.~2\n", sub);
+                        }
                     }
                 }
+                
+                else if (event->mask & IN_MODIFY) {
+                    
+                    char *eventName = event->name;
+                    size_t l = strlen(eventName);
+                    
+                    if (eventName[l - 1] != '~' &&
+                        !(eventName[0] == '.')) {
+                        
+                        if (event->mask & IN_ISDIR) {
+                            printf("The directory %s modified.\n", event->name);
+                        }
+                        else {
+                            if (stat(abspath, &statbuf) != -1) {
+                                fileModified(abspath);
+                                printf("The file %s was modified.~1\n", event->name);
+                            }
+                        }
+                    }
+                }
+                
             }
-//        i += EVENT_SIZE + event->len;
+            event_pnt += EVENT_SIZE + event->len;
         }
     }
-
-    int j;
-    for (j = 0; j < dirNum; j++) {
-        (void) inotify_rm_watch(fd, wd[j]);
+    
+    for (int j = 0; j < MAX_SUBDIR_NUM; j++) {
+        if (folderArray[j] != NULL){
+            (void) inotify_rm_watch(fd, wd[j]);
+        }
     }
-
+    
     (void) close(fd);
     exit(0);
 }
 
-int watchDirectory(char *directory, struct file_table *table) {
-    tableNode = table;
-
-    dirNum = 0;
-
-    fileList = malloc(sizeof(FileList));
+int watchDirectory(file_t *file_table){
+    print_directory_tree(sync_dir);
+    printf("total number of directories = %d\n", dirNum);
+    filetable = file_table;
     
-    readConfigFile(directory);
-
-    pathList = malloc(sizeof(PathList));
-
-    print_directory_tree(current_path);
-
-    printf("\ncount = %d", dirNumbers());
-
-    notify(pathList);
-    return 1;
+    notify(dir_tree);
+    
+    return 0;
 }
