@@ -16,32 +16,6 @@ int endsWith(const char *str, const char *suffix) {
     return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
 }
 
-/*
- Node *lookupNode(char *filename) {
- char abspath[FILE_NAME_LEN];
- strcpy(abspath, sync_dir);
- strcat(abspath, filename);
- 
- Node *myNode = NULL;
- if (tableNode->head != NULL) {
- PointerNode *pointerNode = tableNode->head;
- while (pointerNode) {
- 
- myNode = pointerNode->node;
- char *name = myNode->name;
- char *fullpath = myNode->absolutePath;
- 
- if (strcmp(name, filename) == 0 && strcmp(abspath, fullpath) == 0)
- return myNode;
- 
- pointerNode = pointerNode->next;
- }
- }
- 
- return myNode;
- }
- */
-
 // read sync_dir from config file
 int readConfigFile(char *filename) {
     FILE *fp = fopen(filename, "rb");
