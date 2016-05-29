@@ -36,7 +36,7 @@ typedef struct dir_tree_t{
     DirNode *tail;
 }DirTree;
 
-int watchDirectory(file_t *filetable);
+int watchDirectory(file_t *filetable, int conn);
 
 int readConfigFile(char *filename);
 

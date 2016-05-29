@@ -4,6 +4,7 @@ char sync_dir[FILE_NAME_LEN];   // sync_dir
 DirTree *dir_tree;
 int dirNum;
 file_t *filetable;
+int conn;
 
 // this function is used to detect if str is ended with suffix
 int endsWith(const char *str, const char *suffix) {
@@ -188,6 +189,7 @@ int fileAdded(char *filepath) {
     }
     
     print_filetable();
+    peer_sendpkt(conn, filetable, FILE_UPDATE);
     return 0;
 }
 
@@ -207,6 +209,7 @@ int fileDeleted(char *filepath) {
             }
             free(node);
             print_filetable();
+            peer_sendpkt(conn, filetable, FILE_UPDATE);
             return 0;
         }
         prev = node;
@@ -227,6 +230,7 @@ int fileModified(char *filepath) {
             node->size = fileInfo->size;
             node->timestamp = fileInfo->lastModifyTime;
             print_filetable();
+            peer_sendpkt(conn, filetable, FILE_UPDATE);
             return 0;
         }
         node = node->pNext;
@@ -442,10 +446,11 @@ int notify(DirTree *dirTree) {
     exit(0);
 }
 
-int watchDirectory(file_t *file_table){
+int watchDirectory(file_t *file_table, int tracker_conn){
     print_directory_tree(sync_dir);
     printf("total number of directories = %d\n", dirNum);
     filetable = file_table;
+    conn = tracker_conn;
     
     notify(dir_tree);
     
