@@ -312,7 +312,7 @@ void delete(Node *find) {
     if (strcmp(current->name, find->name) == 0) {
         Node *toDelete = current;
         file_table->head = current->pNext;
-        free(toDelete->name);
+        //free(toDelete->name);
         free(toDelete);
     }
 
@@ -323,7 +323,7 @@ void delete(Node *find) {
 
         Node *toDelete = current->pNext;
         current->pNext = current->pNext->pNext;
-        free(toDelete->name);
+        //free(toDelete->name);
         free(toDelete);
     }
 }
@@ -372,7 +372,7 @@ void ft_destroy(){
 
     // if the pointer does not point to NULL
     if (ptr != NULL) {
-        free(ptr->name);    // free the name of the file
+        //free(ptr->name);    // free the name of the file
         Node *current = ptr;
         ptr = ptr->pNext;   // get the next node
         free(current);  // free the current node
@@ -561,7 +561,7 @@ int main(int argc, const char * argv[]) {
         Node *ptr = trackerFileTable->head;
         // if the pointer does not point to NULL
         if (ptr != NULL) {
-            free(ptr->name);    // free the name of the file
+            //free(ptr->name);    // free the name of the file
             Node *current = ptr;
             ptr = ptr->pNext;   // get the next node
             free(current);  // free the current node
