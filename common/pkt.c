@@ -84,14 +84,14 @@ int peer_recvpkt(int conn, file_t *ft){
     int file_table_size, counter;
     ptp_tracker_t* pkt = calloc(1, sizeof(ptp_tracker_t));
 
-    //recieve first packet containing file_table_size 
+    //receive first packet containing file_table_size
     if (recv(conn, pkt, sizeof(ptp_tracker_t), 0)<0) {
 	free(pkt);
 	return -1;
     }
     file_table_size = pkt->file_table_size;
-    free(pkt);
-    printf("received file_table of size: %d\n", file_table_size);
+    //free(pkt);
+    printf(" received file_table of size: %d\n", file_table_size);
     for ( counter=0; counter < file_table_size; counter++ ) {
 	pkt = calloc(1, sizeof(ptp_tracker_t));
 	if ( recv(conn, pkt, sizeof(ptp_tracker_t), 0) < 0 ) {
@@ -99,20 +99,20 @@ int peer_recvpkt(int conn, file_t *ft){
 	    return -1;
 	}
 	if( counter == 0 ) {
-	    temp        = calloc(1, sizeof(Node));
+	    temp         = calloc(1, sizeof(Node));
 	    *temp        = pkt->file;
-	    ft->head    = temp;
-	    printf("received file_table head\n");
+	    ft->head     = temp;
+	    printf(" received file_table head\n");
 	}
 	else {
-	    temp->pNext = calloc(1, sizeof(Node));
+	    temp->pNext  = calloc(1, sizeof(Node));
 	    *temp->pNext = pkt->file;
-	    temp        = temp->pNext;
+	    temp         = temp->pNext;
 	    printf("received file_table node: %d\n", counter);
 	}
 	free(pkt);
     }
-    
+    free(pkt);
     return 1;
 }
 
@@ -125,7 +125,7 @@ int tracker_sendpkt(int conn, file_t *ft)
     int file_count = 0;
     
     //find no. of files in file_table
-    printf("sending file table");
+    printf("~>tracker_sendpkt: sending file table ");
     if(ft)
 	for( ftemp = ft->head; ftemp != NULL; ftemp = ftemp->pNext, file_count++ ){};
 
@@ -154,7 +154,7 @@ int tracker_sendpkt(int conn, file_t *ft)
 	printf("~>tracker_sendpkt: sent file %s to peer\n", send_pkt->file.name);
 	free(send_pkt);
     }
-
+    printf("~>tracker_sendpkt: sent file %s to peer\n", send_pkt->file.name);
     free(send_pkt);
     return 1;
 }

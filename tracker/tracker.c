@@ -168,6 +168,7 @@ int update_filetable(file_t *peer_ft) {
 	    
 	    //catches case of empty list, head==NULL case
 	    else {
+		printf("~>update_filetable: HEAD was null\n");
 		tracker_ftemp         = calloc(1, sizeof(Node));
 		ft                    = calloc(1, sizeof(file_t));
 		ft->head              = tracker_ftemp;
@@ -180,6 +181,7 @@ int update_filetable(file_t *peer_ft) {
 	    tracker_ftemp->timestamp = peer_ftemp->timestamp;
 	}
     }
+    printf("~>update_filetable: updated file_table with %s as head node\n", ft->head->name);
     return 0;
 }
 
