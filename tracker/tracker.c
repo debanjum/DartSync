@@ -58,10 +58,9 @@ void* handshake(void* arg) {
 		counter = -1;                         // reset counter
 		file_table_size = -1;                 // reset file_table_size, to detect if tracker expects file Node in previous else if
 		free(peer_ft);                        // free peer file table
-
+		
 		if (broadcast_filetable()<0)          // send updated tracker file_table to all peers
-		    printf("~>handshake: error in broadcasting filetable\n");
-	
+		    printf("~>handshake: error in broadcasting filetable\n");	
 	    }
 	}
 	
@@ -96,7 +95,7 @@ void* heartbeat(void* arg) {
 int broadcast_filetable() {
     tracker_peer_t* temp;
     printf("~>broadcast_filetable: broadcasting updated tracker filetable to all peers\n");
-    //search through peers linked_list for peer with peer_sockfd and delete it
+    //traverse through peer_list and transmit file_table to each peer
     for( temp = peer_head; temp != NULL; temp = temp->next )
 	if (tracker_sendpkt(temp->sockfd, ft) < 0)
 	    return -1;
@@ -118,13 +117,11 @@ int update_filetable(file_t *peer_ft) {
 	// traverse through each file till before last in tracker's file table
 	if(ft) {
 	    for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
-	    
 		// if found matching file entry between tracker and peer
 		if (strcmp(tracker_ftemp->name, peer_ftemp->name)==0) {
-		
-		    // UPDATE_FILE_PEERS: if matching file entry in tracker older than on peer, update tracker file_table entry
+		    // UPDATE_FILE_PEERS: if matching file entry in tracker same as on peer, update tracker file_table entry
 		    if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
-			int peers  = sizeof(tracker_ftemp->newpeerip)/IP_LEN;                // find no. of peers in 'newpeerip' string array
+			int peers  = sizeof(tracker_ftemp->newpeerip)/IP_LEN;                  // find no. of peers in 'newpeerip' string array
 			peer_found = 0;
 			
 			// check if peer exists in newpeerip list of peers with latest file version
@@ -133,7 +130,7 @@ int update_filetable(file_t *peer_ft) {
 				peer_found=1;
 				break;
 			    }
-		    
+			
 			// if peer doesn't exist in newpeerip list of peers with latest file version
 			if(!peer_found)
 			    strcpy(tracker_ftemp->newpeerip[peers], peer_ftemp->newpeerip[0]);  // append new peer to end of 'newpeerip' string array
@@ -143,11 +140,13 @@ int update_filetable(file_t *peer_ft) {
 		    }
 		    
 		    // UPDATE_FILE_VERSION : if matching file entry in tracker older than on peer, update tracker file_table entry
-		    if(tracker_ftemp->timestamp < peer_ftemp->timestamp) {
-			tracker_ftemp->size = peer_ftemp->size;
+		    else if(tracker_ftemp->timestamp < peer_ftemp->timestamp) {
+			tracker_ftemp->size      = peer_ftemp->size;
 			tracker_ftemp->timestamp = peer_ftemp->timestamp;
+			tracker_ftemp->type      = peer_ftemp->type;
+			tracker_ftemp->status    = peer_ftemp->status;
 			strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
-			file_found = 1;
+			file_found               = 1;
 			break;
 		    }
 		}
@@ -169,9 +168,9 @@ int update_filetable(file_t *peer_ft) {
 	    //catches case of empty list, head==NULL case
 	    else {
 		printf("~>update_filetable: HEAD was null\n");
-		tracker_ftemp         = calloc(1, sizeof(Node));
-		ft                    = calloc(1, sizeof(file_t));
-		ft->head              = tracker_ftemp;
+		tracker_ftemp        = calloc(1, sizeof(Node));
+		ft                   = calloc(1, sizeof(file_t));
+		ft->head             = tracker_ftemp;
 	    }
 	    
 	    // add file meta data
@@ -179,6 +178,8 @@ int update_filetable(file_t *peer_ft) {
 	    strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
 	    tracker_ftemp->size      = peer_ftemp->size;
 	    tracker_ftemp->timestamp = peer_ftemp->timestamp;
+	    tracker_ftemp->type      = peer_ftemp->type;
+	    tracker_ftemp->status    = peer_ftemp->status;
 	}
     }
     printf("~>update_filetable: updated file_table with %s as head node\n", ft->head->name);
@@ -203,8 +204,8 @@ int add_peer(int peer_sockfd, char ip[IP_LEN]) {
 		return -1;
 	}
 	// append empty peer_tracker struct to end of list
-	temp->next                  = calloc(1, sizeof(tracker_peer_t));
-	temp                        = temp->next;
+	temp->next        = calloc(1, sizeof(tracker_peer_t));
+	temp              = temp->next;
     }
 
     //append new peer data to the end of the list

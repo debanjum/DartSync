@@ -128,7 +128,7 @@ int tracker_sendpkt(int conn, file_t *ft)
     printf("~>tracker_sendpkt: sending file table ");
     if(ft)
 	for( ftemp = ft->head; ftemp != NULL; ftemp = ftemp->pNext, file_count++ ){};
-
+    
     // send first packet with only table size (no. of nodes[files] in linked_list)
     send_pkt->file_table_size = file_count;
     
