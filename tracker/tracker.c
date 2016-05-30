@@ -161,7 +161,7 @@ int update_filetable(file_t *peer_ft) {
 	    //catches case of empty list, head==NULL case
 	    else {
 		tracker_ftemp        = calloc(1, sizeof(Node));
-		ft                   = tracker_ftemp;
+		ft->head                   = tracker_ftemp;
 	    }
 	    
 	    // add file meta data
