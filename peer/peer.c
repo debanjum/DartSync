@@ -271,8 +271,7 @@ void add(download_arg_t *down) {
     // set up the node
     current = (Node *)malloc(sizeof(Node));
     current->size = down->size;
-    current->name = (char *)malloc(256);
-    current->name = down->filename;
+    strcpy(current->name,down->filename);
     current->timestamp = down->timestamp;
     current->pNext = NULL;
 
@@ -294,7 +293,7 @@ void modify(download_arg_t *down) {
 
     // modify the node's information
     current->size = down->size;
-    current->name = down->filename;
+    strcpy(current->name, down->filename);
     current->timestamp = down->timestamp;
 
     // modify the peer ip addresses

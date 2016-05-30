@@ -67,7 +67,7 @@ typedef struct node{
     //the size of the file
     long size;
     //the name of the file
-    char *name;
+    char name[FILE_NAME_LEN];
     //the timestamp when the file is modified or created
     unsigned long int timestamp;
     //the type of file update

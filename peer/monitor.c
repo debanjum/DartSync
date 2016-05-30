@@ -171,7 +171,6 @@ int fileAdded(char *filepath) {
     // add this node to filetable
     Node *filenode = (Node *)malloc(sizeof(Node));
     filenode->status = IS_FILE;
-    filenode->name = (char *)malloc(FILE_NAME_LEN);
     strcpy(filenode->name, fileInfo->filepath);
     filenode->size = fileInfo->size;
     filenode->timestamp = fileInfo->lastModifyTime;

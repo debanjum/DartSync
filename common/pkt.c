@@ -63,7 +63,7 @@ int peer_sendpkt(int conn, file_t *ft, int type){
 	    send_pkt->type            = type;
 	    send_pkt->port            = P2P_PORT;
 	    
-	    if(send(conn, send_pkt, sizeof(ptp_tracker_t), 0) < 0) {
+	    if(send(conn, send_pkt, sizeof(ptp_peer_t), 0) < 0) {
 		free(send_pkt);
 		return -1;
 	    }
