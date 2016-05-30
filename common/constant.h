@@ -57,8 +57,7 @@
 #define HEARTBEAT_TIMEOUT 240   // Peer dead if Tracker doesn't hear its heartbeat not heard for this long
 #define RECV_INTERVAL 1000000
 
-#define TRACKER_IP "73.16.78.254"  // Tracker IP[pi currently], 129.170.214.115[flume]
-#define WATCHING "./"
+#define TRACKER_IP "129.170.214.115"   // Tracker IP[pi: 73.16.78.254], [flume: 129.170.214.115]
 
 // each file can be represented as a node in file table
 typedef struct node{

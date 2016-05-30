@@ -18,9 +18,9 @@ void* handshake(void* arg) {
     int counter = -1, file_table_size = -1;
     file_t *peer_ft;
     Node *temp;
-    
+    printf("->handshake: handshake thread started\n");    
     while( tracker_recvpkt(connection, recv_pkt) > 0 ) {
-	printf("~>tracker: received packet from %s of type %d", recv_pkt->peer_ip, recv_pkt->type);
+	printf("~>handshake: received packet from %s of type %d", recv_pkt->peer_ip, recv_pkt->type);
 	if( recv_pkt->type == REGISTER )
 	    tracker_sendpkt(connection, ft);                  // send tracker file_table to peer as response
 	
@@ -198,6 +198,7 @@ int add_peer(int peer_sockfd, char ip[IP_LEN]) {
     temp->last_time_stamp = (unsigned long)time(NULL);   // peer's current timestamp
     temp->sockfd          = peer_sockfd;                 // peer's connection file descriptor
     temp->next            = NULL;
+    printf("added peer %s to peer_list\n", temp->ip);
     return 1;
 }
 
@@ -252,7 +253,7 @@ int main() {
     if(listen(peer_sockfd, 1) < 0)
 	return -1;
     
-    printf("listening on %d for peer connections", HANDSHAKE_PORT);
+    printf("listening on %d for peer connections\n", HANDSHAKE_PORT);
 
     pthread_t heartbeat_thread;
     pthread_create(&heartbeat_thread, NULL, heartbeat, NULL);
