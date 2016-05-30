@@ -161,7 +161,7 @@ int fileAdded(char *filepath) {
     while (node != NULL){
         if (strcmp(node->name, fileInfo->filepath) == 0){
             printf("~>filemonitor: %s already exists in filetable!\n", node->name);
-            print_filetable();
+            //print_filetable();
             return 0;
         }
         prev = node;
@@ -193,13 +193,12 @@ int fileAdded(char *filepath) {
 }
 
 int fileDeleted(char *filepath) {
-    FileInfo *fileInfo = getFileInfo(filepath);
     Node *node = filetable->head;
     Node *prev = NULL;
-    
+    printf("filename is %s\n", &filepath[strlen(sync_dir)]);
     // loop up this node in filetable
     while (node != NULL){
-        if (strcmp(node->name, fileInfo->filepath) == 0){
+        if (strcmp(node->name, &filepath[strlen(sync_dir)]) == 0){
             if (filetable->head == node) {
                 filetable->head = node->pNext;
             }
@@ -215,7 +214,7 @@ int fileDeleted(char *filepath) {
         node = node->pNext;
     }
     print_filetable();
-    printf("~>filemonitor: cannot find %s in filetable\n", fileInfo->filepath);
+    printf("~>filemonitor: cannot find %s in filetable\n", filepath);
     return -1;
 }
 
@@ -346,7 +345,7 @@ int notify(DirTree *dirTree) {
                         }
                         else {
                             if (stat(abspath, &statbuf) != -1) {
-                                printf("~>filemonitor: The file %s was opened.\n", event->name);
+                                //printf("~>filemonitor: The file %s was opened.\n", event->name);
                             }
                         }
                     }
@@ -379,10 +378,10 @@ int notify(DirTree *dirTree) {
                             }
                         }
                         else {
-                            if (stat(abspath, &statbuf) != -1) {
-                                fileDeleted(abspath);
-                            }
+                            
                             printf("~>filemonitor: The file %s was deleted.\n", event->name);
+                            fileDeleted(abspath);
+                            
                         }
                     }
                     else if (eventName[l - 1] == '~') {
@@ -423,8 +422,8 @@ int notify(DirTree *dirTree) {
                         }
                         else {
                             if (stat(abspath, &statbuf) != -1) {
-                                fileModified(abspath);
                                 printf("~>filemonitor: The file %s was modified.~1\n", event->name);
+                                fileModified(abspath);
                             }
                         }
                     }
