@@ -81,7 +81,7 @@ typedef struct node{
 
 // file table is a linked list of Node
 typedef struct file_table {
-    Node * head;
+    Node *head;
 } file_t;
 
 #endif /* common_h */

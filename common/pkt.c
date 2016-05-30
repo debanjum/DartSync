@@ -125,14 +125,14 @@ int tracker_sendpkt(int conn, file_t *ft)
     int file_count = 0;
     
     //find no. of files in file_table
-    printf("sending file table to peer\n");
+    printf("sending file table");
     if(ft)
 	for( ftemp = ft->head; ftemp != NULL; ftemp = ftemp->pNext, file_count++ ){};
-    printf("tracker_sendpkt: file_count = %d\n", file_count);
 
     // send first packet with only table size (no. of nodes[files] in linked_list)
     send_pkt->file_table_size = file_count;
-
+    
+    printf("of size %d to peer\n", send_pkt->file_table_size);
     if(send(conn, send_pkt, sizeof(ptp_tracker_t), 0) < 0) {
 	free(send_pkt);
 	return -1;
@@ -143,7 +143,7 @@ int tracker_sendpkt(int conn, file_t *ft)
     
     // pack and send each of the nodes in the file table one by one to peer
     for( ftemp = ft->head; ftemp != NULL; ftemp = ftemp->pNext ){
-	ptp_tracker_t *send_pkt = calloc(1, sizeof(ptp_tracker_t));
+	ptp_tracker_t *send_pkt   = calloc(1, sizeof(ptp_tracker_t));
 	send_pkt->file            = *ftemp;
 	send_pkt->file_table_size = -1;
 	
@@ -151,6 +151,7 @@ int tracker_sendpkt(int conn, file_t *ft)
 	    free(send_pkt);
 	    return -1;
 	}
+	printf("~>tracker_sendpkt: sent file %s to peer\n", send_pkt->file.name);
 	free(send_pkt);
     }
 

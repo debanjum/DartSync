@@ -59,7 +59,9 @@ void* handshake(void* arg) {
 		file_table_size = -1;                 // reset file_table_size, to detect if tracker expects file Node in previous else if
 		free(peer_ft);                        // free peer file table
 
-		broadcast_filetable();                // send updated tracker file_table to all peers
+		if (broadcast_filetable()<0)          // send updated tracker file_table to all peers
+		    printf("~>handshake: error in broadcasting filetable\n");
+	
 	    }
 	}
 	
@@ -82,7 +84,7 @@ void* heartbeat(void* arg) {
 	for( temp = peer_head; temp != NULL; temp = temp->next ) 
 	    // when did we last hear from the peer ? if last heard from peer > HEARTBEAT_TIMEOUT
 	    if ( ((unsigned long)time(NULL) - temp->last_time_stamp)  > HEARTBEAT_TIMEOUT )
-		delete_peer(temp->sockfd);
+		delete_peer(temp->sockfd, temp->ip);
 	// sleep between checks
 	sleep(HEARTBEAT_INTERVAL);   
     }
@@ -96,7 +98,8 @@ int broadcast_filetable() {
     printf("~>broadcast_filetable: broadcasting updated tracker filetable to all peers\n");
     //search through peers linked_list for peer with peer_sockfd and delete it
     for( temp = peer_head; temp != NULL; temp = temp->next )
-	tracker_sendpkt(temp->sockfd, ft);
+	if (tracker_sendpkt(temp->sockfd, ft) < 0)
+	    return -1;
     
     return 1;
 }
@@ -165,8 +168,9 @@ int update_filetable(file_t *peer_ft) {
 	    
 	    //catches case of empty list, head==NULL case
 	    else {
-		tracker_ftemp        = calloc(1, sizeof(Node));
-		ft->head                   = tracker_ftemp;
+		tracker_ftemp         = calloc(1, sizeof(Node));
+		ft                    = calloc(1, sizeof(file_t));
+		ft->head              = tracker_ftemp;
 	    }
 	    
 	    // add file meta data
@@ -212,17 +216,37 @@ int add_peer(int peer_sockfd, char ip[IP_LEN]) {
 
 
 //delete peer with given peer socket file descriptor(peer_sockfd)
-int delete_peer(int peer_sockfd) {
+int delete_peer(int peer_sockfd, char peer_ip[IP_LEN]) {
+    int index, counter;
     tracker_peer_t* temp;
+    Node *tracker_ftemp;
     
+    if(ft) {
+	// for each file node in file table
+	for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
+	    // check if peer exists in newpeerip list of peers with latest file version
+	    for( index=0; index<MAX_PEER_NUM && tracker_ftemp->newpeerip[index]!=NULL; index++ ) {
+		// if peer found
+		if( strcmp( tracker_ftemp->newpeerip[index], peer_ip ) == 0 ) {
+		    // traverse and find last peer in Node's peer list
+		    for(counter=index; counter<MAX_PEER_NUM && tracker_ftemp->newpeerip[counter]!=NULL; counter++) {};
+		    
+		    // overwrite peer IP by last set peer IP in Node's peer list
+		    strcpy(tracker_ftemp->newpeerip[index], tracker_ftemp->newpeerip[counter-1]);
+		    // and set overwriteing IP index in peer list to NULL
+		    bzero(tracker_ftemp->newpeerip[counter-1], IP_LEN);
+		}
+	    }
+	}
+    }
     //search through peers linked_list for peer with peer_sockfd and delete it
-    for( temp = peer_head; temp != NULL; temp = temp->next )
+    for( temp = peer_head; temp != NULL; temp = temp->next)
 	if (temp->sockfd == peer_sockfd) {
+	    close(temp->sockfd);
 	    temp = temp->next;
-	    return 1;
 	}
     
-    return -1;
+    return 1;
 }
 
 

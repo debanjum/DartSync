@@ -4,6 +4,8 @@
 TAGS
 tracker/tracker
 peer/peer
+peer/sync
+core.*
 # Editor Backup Files
 *~
 .\#*

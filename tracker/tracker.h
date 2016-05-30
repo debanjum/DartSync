@@ -26,7 +26,7 @@ int add_peer(int peer_sockfd, char ip[IP_LEN]);
 int heard_peer(int peer_sockfd);
 
 //delete peer with given peer socket file descriptor(peer_sockfd)
-int delete_peer(int peer_sockfd);
+int delete_peer(int peer_sockfd, char peer_ip[IP_LEN]);
 
 // update tracker filetable based on information from peer's filetable
 int update_filetable(file_t *peer_ft);
