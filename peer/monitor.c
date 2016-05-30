@@ -172,6 +172,7 @@ int fileAdded(char *filepath) {
     Node *filenode = (Node *)malloc(sizeof(Node));
     filenode->status = IS_FILE;
     strcpy(filenode->name, fileInfo->filepath);
+    filenode->type = FILE_CREATE;
     filenode->size = fileInfo->size;
     filenode->timestamp = fileInfo->lastModifyTime;
     filenode->pNext = NULL;
@@ -194,23 +195,16 @@ int fileAdded(char *filepath) {
 
 int fileDeleted(char *filepath) {
     Node *node = filetable->head;
-    Node *prev = NULL;
+    
     printf("filename is %s\n", &filepath[strlen(sync_dir)]);
     // loop up this node in filetable
     while (node != NULL){
         if (strcmp(node->name, &filepath[strlen(sync_dir)]) == 0){
-            if (filetable->head == node) {
-                filetable->head = node->pNext;
-            }
-            else {
-                prev->pNext = node->pNext;
-            }
-            free(node);
+            node->type = FILE_DELETE;
             print_filetable();
             peer_sendpkt(conn, filetable, FILE_UPDATE);
             return 0;
         }
-        prev = node;
         node = node->pNext;
     }
     print_filetable();
@@ -227,6 +221,7 @@ int fileModified(char *filepath) {
         if (strcmp(node->name, fileInfo->filepath) == 0) {
             node->size = fileInfo->size;
             node->timestamp = fileInfo->lastModifyTime;
+            node->type = FILE_MODIFY;
             print_filetable();
             peer_sendpkt(conn, filetable, FILE_UPDATE);
             return 0;
@@ -245,6 +240,7 @@ void print_filetable(){
     printf("~>filemonitor: printing filetable...\n");
     while (node != NULL){
         printf("~>filemonitor: %d node filename = %s\n", cnt, node->name);
+        printf("~>filemonitor: %d node type = %d\n", cnt, node->type);
         printf("~>filemonitor: %d node size = %lu\n", cnt, node->size);
         printf("~>filemonitor: %d node lastModifyTime = %lu\n", cnt, node->timestamp);
         printf("~>filemonitor: %d node peer ip = %s\n", cnt, node->newpeerip[0]);

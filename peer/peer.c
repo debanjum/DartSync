@@ -448,15 +448,16 @@ void compareNode(Node *seekNode) {
         if (current->timestamp < seekNode->timestamp) {
 
             // if we need to modify the file
-            if (current->status != FILE_DELETE) {
+             if (current->status != FILE_DELETE) {
 
                 download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
 
                 // fill in the data for download_arg
                 strcpy(download_arg->filename, current->name);
 
+                
                 int peers = (sizeof(current->newpeerip))/IP_LEN;
-                download_arg->peerNum = peers;
+                download_arg->peerNum = peers;  // ? wrong?
                 for (int i = 0; i < peers; i++) {
                     struct sockaddr_in address;
                     inet_aton(current->newpeerip[i], &address.sin_addr);
@@ -468,12 +469,13 @@ void compareNode(Node *seekNode) {
                 // create a ptp_download thread
                 pthread_t ptp_download_thread;
                 pthread_create(&ptp_download_thread, NULL, ptp_download, (void*)download_arg);
-            }
+             }
 
             // otherwise, we need to delete the file
             else {
 
                 // delete the file from the local directory first
+                // current->name should be appended to the current sync folder path
                 int ret = remove(current->name);
                 if (ret != 0) {
                     perror("Unable to delete the file");
