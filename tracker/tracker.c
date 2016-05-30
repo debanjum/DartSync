@@ -20,7 +20,7 @@ void* handshake(void* arg) {
     Node *temp;
     printf("->handshake: handshake thread started\n");    
     while( tracker_recvpkt(connection, recv_pkt) > 0 ) {
-	printf("~>handshake: received packet from %s of type %d", recv_pkt->peer_ip, recv_pkt->type);
+	printf("~>handshake: received packet from %s of type %d\n", recv_pkt->peer_ip, recv_pkt->type);
 	if( recv_pkt->type == REGISTER )
 	    tracker_sendpkt(connection, ft);                  // send tracker file_table to peer as response
 	
@@ -28,6 +28,7 @@ void* handshake(void* arg) {
 
 	    // if tracker expects first FILE_UPDATE and peer sent first FILE_UPDATE packet 
 	    if( counter == -1 && recv_pkt->file_table_size != -1)  {
+		printf("~>handshake: received 1ST file node from peer\n");
 		file_table_size = recv_pkt->file_table_size;        // first FILE_UPDATE packet contains only no. of nodes in linked list
 		peer_ft = calloc(1, sizeof(file_t));                // initialize peer_file table for receiving
 	    }
@@ -38,17 +39,20 @@ void* handshake(void* arg) {
 		if( counter == 0 ) {                          
 		    temp           = calloc(1, sizeof(Node));
 		    *temp          = recv_pkt->file;
-		    peer_ft->head  = temp;	    
+		    peer_ft->head  = temp;
+		    printf("~>handshake: received 2ND file node from peer\n");
 		}
 		else {
 		    temp->pNext    = calloc(1, sizeof(Node));
 		    *temp->pNext   = recv_pkt->file;
 		    temp           = temp->pNext;
+		    printf("~>handshake: received >=3RD file node from peer\n");
 		}
 	    }
 	    
 	    // if received last file Node of peer's file_table
 	    if ( counter == (file_table_size-1) ) {
+		printf("~>handshake: received last file node from peer\n");
 		update_filetable(peer_ft);            // update tracker file_table based on information from peer's file_table
 		
 		counter = -1;                         // reset counter
@@ -62,7 +66,7 @@ void* handshake(void* arg) {
 	else if( recv_pkt->type == KEEP_ALIVE )       // if receive heartbeat message(KEEP_ALIVE)
 	    heard_peer(connection);                   // update last_heard timestamp of peer with 'connection'
     }
-    
+    printf("~>handshake: exiting handshake thread\n");
     free(recv_pkt);
     return 0;
 }
@@ -89,7 +93,7 @@ void* heartbeat(void* arg) {
 // send tracker filetable to all peer's in peers_list
 int broadcast_filetable() {
     tracker_peer_t* temp;
-    
+    printf("~>broadcast_filetable: broadcasting updated tracker filetable to all peers\n");
     //search through peers linked_list for peer with peer_sockfd and delete it
     for( temp = peer_head; temp != NULL; temp = temp->next )
 	tracker_sendpkt(temp->sockfd, ft);
@@ -103,6 +107,7 @@ int update_filetable(file_t *peer_ft) {
     Node *peer_ftemp, *tracker_ftemp;
     int file_found = 0, index, peer_found=0;
 
+    printf("~>update_filetable: updating tracker file table\n");
     // traverse through each file in peer's file table
     for( peer_ftemp = peer_ft->head; peer_ftemp != NULL; peer_ftemp = peer_ftemp->pNext ) {
 	file_found = 0;

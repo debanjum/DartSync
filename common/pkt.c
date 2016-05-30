@@ -62,6 +62,7 @@ int peer_sendpkt(int conn, file_t *ft, int type){
 	    send_pkt->file_table_size = -1;
 	    send_pkt->type            = type;
 	    send_pkt->port            = P2P_PORT;
+	    strcpy(send_pkt->peer_ip, getmyip()); // set my(peer) IP
 	    
 	    if(send(conn, send_pkt, sizeof(ptp_peer_t), 0) < 0) {
 		free(send_pkt);
