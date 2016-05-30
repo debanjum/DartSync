@@ -108,46 +108,47 @@ int update_filetable(file_t *peer_ft) {
 	file_found = 0;
 	
 	// traverse through each file till before last in tracker's file table
-	for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
+	if(ft) {
+	    for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
 	    
-	    // if found matching file entry between tracker and peer
-	    if (strcmp(tracker_ftemp->name, peer_ftemp->name)==0) {
+		// if found matching file entry between tracker and peer
+		if (strcmp(tracker_ftemp->name, peer_ftemp->name)==0) {
 		
-		// UPDATE_FILE_PEERS: if matching file entry in tracker older than on peer, update tracker file_table entry
-		if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
-		    int peers  = sizeof(tracker_ftemp->newpeerip)/IP_LEN;                // find no. of peers in 'newpeerip' string array
-		    peer_found = 0;
+		    // UPDATE_FILE_PEERS: if matching file entry in tracker older than on peer, update tracker file_table entry
+		    if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
+			int peers  = sizeof(tracker_ftemp->newpeerip)/IP_LEN;                // find no. of peers in 'newpeerip' string array
+			peer_found = 0;
+			
+			// check if peer exists in newpeerip list of peers with latest file version
+			for( index=0; index<peers; index++)
+			    if(strcmp(tracker_ftemp->newpeerip[index], peer_ftemp->newpeerip[0])==0) {
+				peer_found=1;
+				break;
+			    }
 		    
-		    // check if peer exists in newpeerip list of peers with latest file version
-		    for( index=0; index<peers; index++)
-			if(strcmp(tracker_ftemp->newpeerip[index], peer_ftemp->newpeerip[0])==0) {
-			    peer_found=1;
-			    break;
-			}
+			// if peer doesn't exist in newpeerip list of peers with latest file version
+			if(!peer_found)
+			    strcpy(tracker_ftemp->newpeerip[peers], peer_ftemp->newpeerip[0]);  // append new peer to end of 'newpeerip' string array
+			
+			file_found = 1;
+			break;
+		    }
 		    
-		    // if peer doesn't exist in newpeerip list of peers with latest file version
-		    if(!peer_found)
-			strcpy(tracker_ftemp->newpeerip[peers], peer_ftemp->newpeerip[0]);  // append new peer to end of 'newpeerip' string array
-		    
-		    file_found = 1;
-		    break;
+		    // UPDATE_FILE_VERSION : if matching file entry in tracker older than on peer, update tracker file_table entry
+		    if(tracker_ftemp->timestamp < peer_ftemp->timestamp) {
+			tracker_ftemp->size = peer_ftemp->size;
+			tracker_ftemp->timestamp = peer_ftemp->timestamp;
+			strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
+			file_found = 1;
+			break;
+		    }
 		}
 		
-		// UPDATE_FILE_VERSION : if matching file entry in tracker older than on peer, update tracker file_table entry
-		if(tracker_ftemp->timestamp < peer_ftemp->timestamp) {
-		    tracker_ftemp->size = peer_ftemp->size;
-		    tracker_ftemp->timestamp = peer_ftemp->timestamp;
-		    strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
-		    file_found = 1;
+		// break while pointer still pointing to last element in file_table linked list. Allows appending later if required
+		if (tracker_ftemp->pNext == NULL)
 		    break;
-		}
 	    }
-	    
-	    // break while pointer still pointing to last element in file_table linked list. Allows appending later if required
-	    if (tracker_ftemp->pNext == NULL)
-		break;
 	}
-	
 	// ADD_FILE: if no file with current file_name on peer found on tracker's file table, append the file to tracker's file table
 	if(!file_found) {
 	    
@@ -158,8 +159,10 @@ int update_filetable(file_t *peer_ft) {
 	    }
 	    
 	    //catches case of empty list, head==NULL case
-	    else
+	    else {
 		tracker_ftemp        = calloc(1, sizeof(Node));
+		ft                   = tracker_ftemp;
+	    }
 	    
 	    // add file meta data
 	    strcpy(tracker_ftemp->name, peer_ftemp->name);
