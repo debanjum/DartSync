@@ -3,7 +3,7 @@
 //  tracker
 //
 //  Created by Debanjum Singh Solanky on 05/20/16.
-//  Copyright © 2016 Debanjum Singh Solanky. All rights reserved.
+//  Copyright ï¿½ 2016 Debanjum Singh Solanky. All rights reserved.
 
 #include "tracker.h"
 
@@ -295,7 +295,7 @@ int main() {
     while((connection = accept(peer_sockfd, (struct sockaddr*)&peer_addr, &peer_addr_len))>0) {
 	printf("accepted connection from %s\n", inet_ntoa(peer_addr.sin_addr));
 	// Register peer in peer-list, [MAYBE] Ideally should be in handshake_thread, if peer sends pkt of type pkt->type=REGISTER
-	add_peer(peer_sockfd, inet_ntoa(peer_addr.sin_addr));
+	add_peer(connection, inet_ntoa(peer_addr.sin_addr));
 	
 	// Create and hand-off communication with peer to a separate handshake thread
 	pthread_t handshake_thread;

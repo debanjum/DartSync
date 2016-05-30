@@ -91,7 +91,7 @@ int peer_recvpkt(int conn, file_t *ft){
     }
     file_table_size = pkt->file_table_size;
     //free(pkt);
-    printf(" received file_table of size: %d\n", file_table_size);
+    printf("~>handshake: received file_table of size: %d\n", file_table_size);
     for ( counter=0; counter < file_table_size; counter++ ) {
 	pkt = calloc(1, sizeof(ptp_tracker_t));
 	if ( recv(conn, pkt, sizeof(ptp_tracker_t), 0) < 0 ) {
@@ -102,13 +102,13 @@ int peer_recvpkt(int conn, file_t *ft){
 	    temp         = calloc(1, sizeof(Node));
 	    *temp        = pkt->file;
 	    ft->head     = temp;
-	    printf(" received file_table head\n");
+	    printf("~>handshake: received file_table head\n");
 	}
 	else {
 	    temp->pNext  = calloc(1, sizeof(Node));
 	    *temp->pNext = pkt->file;
 	    temp         = temp->pNext;
-	    printf("received file_table node: %d\n", counter);
+	    printf("~>handshake: received file_table node: %d\n", counter);
 	}
 	free(pkt);
     }

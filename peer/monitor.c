@@ -21,7 +21,7 @@ int endsWith(const char *str, const char *suffix) {
 char *readConfigFile(char *filename) {
     FILE *fp = fopen(filename, "rb");
     if (fp == NULL){
-        printf("cannot open config file %s!\n", filename);
+        printf("~>filemonitor: cannot open config file %s!\n", filename);
         return NULL;
     }
     
@@ -33,17 +33,17 @@ char *readConfigFile(char *filename) {
         strcat(line, "/");
     }
     strcpy(sync_dir, line);
-    printf("sync_dir = %s read from config.data\n", sync_dir);
+    printf("~>filemonitor: sync_dir = %s read from config.data\n", sync_dir);
     
     // check if the dir exists, if not, create a new folder
     struct stat st = {0};
     if (stat(line, &st) == -1) {
-        printf("%s does not exist!\n", line);
-        printf("creating a new folder %s...\n", line);
+        printf("~>filemonitor: %s does not exist!\n", line);
+        printf("~>filemonitor: creating a new sync folder %s...\n", line);
         mkdir(line, 0700);
     }
     else{
-        printf("%s exists.\n", line);
+        printf("~>filemonitor: sync folder %s exists.\n", line);
     }
     
     return sync_dir;
@@ -51,11 +51,11 @@ char *readConfigFile(char *filename) {
 
 // print out dir tree
 void printDirTree(DirTree *dirTree) {
-    printf("number of nodes in dir tree = %d\n", dirNum);
+    printf("~>filemonitor: number of nodes in dir tree = %d\n", dirNum);
     DirNode *node = dirTree->head;
     int cnt = 1;
     while (node != NULL) {
-        printf("%d node in dir tree: %s\n", cnt, node->dirpath);
+        printf("~>filemonitor: %d node in dir tree: %s\n", cnt, node->dirpath);
         node = node->next;
         cnt++;
     }
@@ -160,7 +160,7 @@ int fileAdded(char *filepath) {
     // loop up this node in filetable
     while (node != NULL){
         if (strcmp(node->name, fileInfo->filepath) == 0){
-            printf("%s already exists in filetable!\n", node->name);
+            printf("~>filemonitor: %s already exists in filetable!\n", node->name);
             print_filetable();
             return 0;
         }
@@ -215,7 +215,7 @@ int fileDeleted(char *filepath) {
         node = node->pNext;
     }
     print_filetable();
-    printf("cannot find %s in filetable\n", fileInfo->filepath);
+    printf("~>filemonitor: cannot find %s in filetable\n", fileInfo->filepath);
     return -1;
 }
 
@@ -235,7 +235,7 @@ int fileModified(char *filepath) {
         node = node->pNext;
     }
     print_filetable();
-    printf("cannot find %s in filetable\n", fileInfo->filepath);
+    printf("~>filemonitor: cannot find %s in filetable\n", fileInfo->filepath);
     return -1;
 }
 
@@ -243,12 +243,12 @@ int fileModified(char *filepath) {
 void print_filetable(){
     Node *node = filetable->head;
     int cnt = 0;
-    printf("printing filetable...\n");
+    printf("~>filemonitor: printing filetable...\n");
     while (node != NULL){
-        printf("%d node filename = %s\n", cnt, node->name);
-        printf("%d node size = %lu\n", cnt, node->size);
-        printf("%d node lastModifyTime = %lu\n", cnt, node->timestamp);
-        printf("%d node peer ip = %s\n", cnt, node->newpeerip[0]);
+        printf("~>filemonitor: %d node filename = %s\n", cnt, node->name);
+        printf("~>filemonitor: %d node size = %lu\n", cnt, node->size);
+        printf("~>filemonitor: %d node lastModifyTime = %lu\n", cnt, node->timestamp);
+        printf("~>filemonitor: %d node peer ip = %s\n", cnt, node->newpeerip[0]);
         node = node->pNext;
         cnt++;
     }
@@ -275,7 +275,7 @@ int notify(DirTree *dirTree) {
     char *path;
     while (dirNode != NULL) {
         path = dirNode->dirpath;
-        printf("adding dir %s to inotify_add_watch()\n", path);
+        printf("~>filemonitor: adding dir %s to inotify_add_watch()\n", path);
         folderArray[count] = path;
         wd[count++] = inotify_add_watch(fd, path,
                                         IN_OPEN | IN_MODIFY | IN_CREATE | IN_DELETE | IN_DELETE_SELF | IN_MOVED_TO |
@@ -311,10 +311,10 @@ int notify(DirTree *dirTree) {
                         !(eventName[0] == '.' )) { // filter out all hiden files
                         
                         if (event->mask & IN_ISDIR) {
-                            printf("The directory %s was created.\n", event->name);
+                            printf("~>filemonitor: The directory %s was created.\n", event->name);
                             // add this new directory to dir tree
                             addDirNode(dirTree, abspath);
-                            printf("adding dir %s to inotify_add_watch()\n", abspath);
+                            printf("~>filemonitor: adding dir %s to inotify_add_watch()\n", abspath);
                             folderArray[count] = abspath;
                             wd[count++] = inotify_add_watch(fd, abspath,
                                                             IN_OPEN | IN_MODIFY | IN_CREATE | IN_DELETE | IN_DELETE_SELF | IN_MOVED_TO |
@@ -323,11 +323,11 @@ int notify(DirTree *dirTree) {
                         }
                         else {
                             if (stat(abspath, &statbuf) != -1) {
-                                printf("The file %s was created.\n", event->name);
+                                printf("~>filemonitor: The file %s was created.\n", event->name);
                                 fileAdded(abspath); // when add a file, should firstly check whether it exists
                                 if (strcmp(eventName, "ccc") == 0) {
                                     //Node *nd = lookupNode(eventName);
-                                    printf("eventName = %s\n", eventName);
+                                    printf("~>filemonitor: eventName = %s\n", eventName);
                                     //printf("name %s\n", nd->name);
                                 }
                             }
@@ -346,7 +346,7 @@ int notify(DirTree *dirTree) {
                         }
                         else {
                             if (stat(abspath, &statbuf) != -1) {
-                                printf("The file %s was opened.\n", event->name);
+                                printf("~>filemonitor: The file %s was opened.\n", event->name);
                             }
                         }
                     }
@@ -360,7 +360,7 @@ int notify(DirTree *dirTree) {
                         !(eventName[0] == '.')) {
                         
                         if (event->mask & IN_ISDIR) {
-                            printf("The directory %s was deleted.\n", event->name);
+                            printf("~>filemonitor: The directory %s was deleted.\n", event->name);
                             
                             // remove this directory from dir tree
                             deleteDirNode(dirTree, abspath);
@@ -371,7 +371,7 @@ int notify(DirTree *dirTree) {
                                     continue;
                                 }
                                 if (strstr(folderArray[i], abspath) != NULL){
-                                    printf("wd index = %d\n", i);
+                                    printf("~>filemonitor: wd index = %d\n", i);
                                     (void) inotify_rm_watch(fd, wd[i]);
                                     folderArray[i] = NULL;
                                     break;
@@ -382,7 +382,7 @@ int notify(DirTree *dirTree) {
                             if (stat(abspath, &statbuf) != -1) {
                                 fileDeleted(abspath);
                             }
-                            printf("The file %s was deleted.\n", event->name);
+                            printf("~>filemonitor: The file %s was deleted.\n", event->name);
                         }
                     }
                     else if (eventName[l - 1] == '~') {
@@ -399,7 +399,7 @@ int notify(DirTree *dirTree) {
                         sub[sz - 1] = '\0';
                         
                         if (event->mask & IN_ISDIR) {
-                            printf("The directory %s was modified.\n", sub);
+                            printf("~>filemonitor: The directory %s was modified.\n", sub);
                         }
                         else {
                             if (stat(abspath, &statbuf) != -1) {
@@ -419,12 +419,12 @@ int notify(DirTree *dirTree) {
                         !(eventName[0] == '.')) {
                         
                         if (event->mask & IN_ISDIR) {
-                            printf("The directory %s modified.\n", event->name);
+                            printf("~>filemonitor: The directory %s modified.\n", event->name);
                         }
                         else {
                             if (stat(abspath, &statbuf) != -1) {
                                 fileModified(abspath);
-                                printf("The file %s was modified.~1\n", event->name);
+                                printf("~>filemonitor: The file %s was modified.~1\n", event->name);
                             }
                         }
                     }
@@ -447,7 +447,7 @@ int notify(DirTree *dirTree) {
 
 int watchDirectory(file_t *file_table, int tracker_conn){
     print_directory_tree(sync_dir);
-    printf("total number of directories = %d\n", dirNum);
+    //printf("total number of directories = %d\n", dirNum);
     filetable = file_table;
     conn = tracker_conn;
     
