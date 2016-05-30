@@ -293,7 +293,7 @@ int main() {
     pthread_create(&heartbeat_thread, NULL, heartbeat, NULL);
 
     while((connection = accept(peer_sockfd, (struct sockaddr*)&peer_addr, &peer_addr_len))>0) {
-	printf("accepted connection from %s\n", inet_ntoa(peer_addr.sin_addr));
+	printf("accepted connection from %s and create a socket %d\n", inet_ntoa(peer_addr.sin_addr), connection);
 	// Register peer in peer-list, [MAYBE] Ideally should be in handshake_thread, if peer sends pkt of type pkt->type=REGISTER
 	add_peer(connection, inet_ntoa(peer_addr.sin_addr));
 	

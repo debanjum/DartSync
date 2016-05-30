@@ -93,7 +93,7 @@ int peer_recvpkt(int conn, file_t *ft){
     //free(pkt);
     printf("~>handshake: received file_table of size: %d\n", file_table_size);
     for ( counter=0; counter < file_table_size; counter++ ) {
-	pkt = calloc(1, sizeof(ptp_tracker_t));
+	ptp_tracker_t* pkt = calloc(1, sizeof(ptp_tracker_t));
 	if ( recv(conn, pkt, sizeof(ptp_tracker_t), 0) < 0 ) {
 	    free(pkt);
 	    return -1;
@@ -132,7 +132,7 @@ int tracker_sendpkt(int conn, file_t *ft)
     // send first packet with only table size (no. of nodes[files] in linked_list)
     send_pkt->file_table_size = file_count;
     
-    printf("of size %d to peer\n", send_pkt->file_table_size);
+    printf("of size %d to peer through socket %d\n", send_pkt->file_table_size, conn);
     if(send(conn, send_pkt, sizeof(ptp_tracker_t), 0) < 0) {
 	free(send_pkt);
 	return -1;
@@ -151,10 +151,9 @@ int tracker_sendpkt(int conn, file_t *ft)
 	    free(send_pkt);
 	    return -1;
 	}
-	printf("~>tracker_sendpkt: sent file %s to peer\n", send_pkt->file.name);
+	printf("~>tracker_sendpkt: sent file %s to peer through socket %d\n", send_pkt->file.name, conn);
 	free(send_pkt);
     }
-    printf("~>tracker_sendpkt: sent file %s to peer\n", send_pkt->file.name);
     free(send_pkt);
     return 1;
 }
