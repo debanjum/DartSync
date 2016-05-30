@@ -38,7 +38,7 @@ typedef struct dir_tree_t{
 
 int watchDirectory(file_t *filetable, int conn);
 
-int readConfigFile(char *filename);
+char *readConfigFile(char *filename);
 
 int fileAdded(char* filename);
 

@@ -18,11 +18,11 @@ int endsWith(const char *str, const char *suffix) {
 }
 
 // read sync_dir from config file
-int readConfigFile(char *filename) {
+char *readConfigFile(char *filename) {
     FILE *fp = fopen(filename, "rb");
     if (fp == NULL){
         printf("cannot open config file %s!\n", filename);
-        return -1;
+        return NULL;
     }
     
     char line[FILE_NAME_LEN];
@@ -46,7 +46,7 @@ int readConfigFile(char *filename) {
         printf("%s exists.\n", line);
     }
     
-    return 0;
+    return sync_dir;
 }
 
 // print out dir tree

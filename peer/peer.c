@@ -42,7 +42,7 @@ void* ptp_listening(void* arg){
         
         // change filename into file path
         char file_path[FILE_NAME_LEN];
-        strcpy(file_path, WATCHING);
+        strcpy(file_path, readConfigFile("config.data"));
         strcat(file_path, filename);
         printf("data request: file_path = %s\n", file_path);
         strcpy(arg->file_path, file_path);
