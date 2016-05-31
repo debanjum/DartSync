@@ -363,6 +363,7 @@ void peer_stop(){
     ft_destroy();
     close(ptp_listen_fd);
     close(tracker_conn);
+    exit(0);
 }
 
 // this function is used to start connection to tracker, send REGISTER pkt and wait for ACCEPT pkt.

@@ -290,10 +290,12 @@ int heard_peer(int peer_sockfd) {
 
 
 void tracker_stop() {
+    printf("\n~>tracker_stop: gracefully closing down tracker\n");
     pthread_exit(&handshake_thread);
     pthread_exit(&heartbeat_thread);
     close(peer_sockfd);
     free(ft);
+    exit(0);
 }
 
 
@@ -302,7 +304,6 @@ int main() {
     int connection;
     struct sockaddr_in peer_addr;
     socklen_t peer_addr_len = sizeof(struct sockaddr_in);
-
 
     // register a signal handler which is sued to terminate the process
     signal(SIGINT, tracker_stop);
