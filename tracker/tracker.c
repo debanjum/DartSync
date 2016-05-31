@@ -20,7 +20,7 @@ void* handshake(void* arg) {
     int connection = *(int *)arg;
     ptp_peer_t* recv_pkt = (ptp_peer_t *)calloc(1,sizeof(ptp_peer_t));
     
-    int counter = -1, file_table_size = -1;
+    int counter = -1, file_table_size = -1, counter2;
     file_t *peer_ft;
     Node *temp;
     
@@ -51,12 +51,15 @@ void* handshake(void* arg) {
 		    temp           = calloc(1, sizeof(Node));
 		    *temp          = recv_pkt->file;
 		    peer_ft->head  = temp;
+		    for( counter2 = 0; counter2 < MAX_PEER_NUM; counter2++) { bzero(temp->newpeerip[counter2], IP_LEN+1); } 
 		    printf("~>handshake: received 2ND file node from peer\n");
 		}
 		else {
 		    temp->pNext    = calloc(1, sizeof(Node));
 		    *temp->pNext   = recv_pkt->file;
 		    temp           = temp->pNext;
+		    for( counter2 = 0; counter2 < MAX_PEER_NUM; counter2++) { bzero(temp->newpeerip[counter2], IP_LEN+1); }
+
 		    printf("~>handshake: received >=3RD file node from peer\n");
 		}
 	    }
@@ -117,34 +120,39 @@ int broadcast_filetable() {
     return 1;
 }
 
+int display_filetable() {
+    int index, index2;
+    Node *tracker_ftemp;
+    // display tracker file table on every file_update
+    for( tracker_ftemp = ft->head, index2=0; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext, index2++ ) {
+	printf("~>update_filetable: %d node filename = %s\n", index2, tracker_ftemp->name);
+	printf("~>update_filetable: %d node type = %d\n", index2, tracker_ftemp->type);
+	printf("~>update_filetable: %d node size = %lu\n", index2, tracker_ftemp->size);
+	printf("~>update_filetable: %d node lastModifyTime = %lu\n", index2, tracker_ftemp->timestamp);
+	printf("~>update_filetable: %d node peer ip =", index2);
+	// check if peer exists in newpeerip list of peers with latest file version
+	for( index=0; index<MAX_PEER_NUM && tracker_ftemp->newpeerip[index]!=NULL; index++)
+	    printf(" %s,", tracker_ftemp->newpeerip[index]);
+	printf("\n");
+    }
+    return 0;
+}
 
 // update tracker filetable based on information from peer's filetable
 int update_filetable(file_t *peer_ft) {
     Node *peer_ftemp, *tracker_ftemp;
-    int file_found = 0, peer_found=0, index, index2;
+    int file_found = 0, peer_found = 0, index = 0;
     
     printf("~>update_filetable: updating tracker file table\n");
     // traverse through each file in peer's file table
     for( peer_ftemp = peer_ft->head; peer_ftemp != NULL; peer_ftemp = peer_ftemp->pNext ) {
 	file_found = 0;
 	
-	// traverse through each file till before last in tracker's file table
-	if(ft) {
-	    // display tracker file table on every file_update
-	    for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext, index2++ ) {
-		printf("~>update_filetable: %d node filename = %s\n", index2, tracker_ftemp->name);
-		printf("~>update_filetable: %d node type = %d\n", index2, tracker_ftemp->type);
-		printf("~>update_filetable: %d node size = %lu\n", index2, tracker_ftemp->size);
-		printf("~>update_filetable: %d node lastModifyTime = %lu\n", index2, tracker_ftemp->timestamp);
-		printf("~>update_filetable: %d node peer ip =", index2);
-		// check if peer exists in newpeerip list of peers with latest file version
-		for( index=0; index<MAX_PEER_NUM && tracker_ftemp->newpeerip[index]; index++)
-		    printf(" %s,", tracker_ftemp->newpeerip[index]);
-		printf("\n");
-
-	    }
+	if(ft) {	    
+	    // traverse through each file till before last in tracker's file table
 	    for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
 		
+		// checking if current peer and tracker node name's set
 		if ( !tracker_ftemp->name || !peer_ftemp->name)
 		    printf("~>[ERROR] update_filetable: a tracker or peer node name\n");
 		else
@@ -158,7 +166,7 @@ int update_filetable(file_t *peer_ft) {
 			peer_found = 0;
 
 			// check if peer exists in newpeerip list of peers with latest file version
-			for( index=0; index<MAX_PEER_NUM && tracker_ftemp->newpeerip[index]; index++)
+			for( index=0; index<MAX_PEER_NUM && tracker_ftemp->newpeerip[index]!=NULL; index++)
 			    if(strcmp(tracker_ftemp->newpeerip[index], peer_ftemp->newpeerip[0])==0) {
 				peer_found=1;
 				break;
@@ -218,13 +226,14 @@ int update_filetable(file_t *peer_ft) {
 	    //printf("~>update_filetable: added %s from %s to file table\n", ft->head->name);
 	}
     }
+    display_filetable();
     printf("~>update_filetable: updated file table successfully\n");
     return 0;
 }
 
 
 // add peer to tracker_peer_t list
-int add_peer(int peer_sockfd, char ip[IP_LEN]) {
+int add_peer(int peer_sockfd, char ip[IP_LEN+1]) {
     tracker_peer_t* temp;
     
     //if first peer has come online
@@ -245,7 +254,7 @@ int add_peer(int peer_sockfd, char ip[IP_LEN]) {
     }
 
     //append new peer data to the end of the list
-    memcpy(temp->ip, ip, IP_LEN);                        // peer's ip address string
+    memcpy(temp->ip, ip, IP_LEN+1);                        // peer's ip address string
     temp->last_time_stamp = (unsigned long)time(NULL);   // peer's current timestamp
     temp->sockfd          = peer_sockfd;                 // peer's connection file descriptor
     temp->next            = NULL;
@@ -255,7 +264,7 @@ int add_peer(int peer_sockfd, char ip[IP_LEN]) {
 
 
 //delete peer with given peer socket file descriptor(peer_sockfd)
-int delete_peer(int peer_sockfd, char peer_ip[IP_LEN]) {
+int delete_peer(int peer_sockfd, char peer_ip[IP_LEN+1]) {
     int index, counter;
     tracker_peer_t* temp;
     Node *tracker_ftemp;
@@ -264,7 +273,7 @@ int delete_peer(int peer_sockfd, char peer_ip[IP_LEN]) {
 	// for each file node in file table
 	for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
 	    // check if peer exists in newpeerip list of peers with latest file version
-	    for( index=0; index<MAX_PEER_NUM && tracker_ftemp->newpeerip[index]; index++ ) {
+	    for( index=0; index<MAX_PEER_NUM && tracker_ftemp->newpeerip[index]!=NULL; index++ ) {
 		// if peer found
 		if( strcmp( tracker_ftemp->newpeerip[index], peer_ip ) == 0 ) {
 		    // traverse and find last peer in Node's peer list
@@ -273,7 +282,7 @@ int delete_peer(int peer_sockfd, char peer_ip[IP_LEN]) {
 		    // overwrite peer IP by last set peer IP in Node's peer list
 		    strcpy(tracker_ftemp->newpeerip[index], tracker_ftemp->newpeerip[counter-1]);
 		    // and set overwriting IP index in peer list to NULL
-		    bzero(tracker_ftemp->newpeerip[counter-1], IP_LEN);
+		    bzero(tracker_ftemp->newpeerip[counter-1], IP_LEN+1);
 		}
 	    }
 	}

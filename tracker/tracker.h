@@ -34,6 +34,9 @@ int update_filetable(file_t *peer_ft);
 // send tracker filetable to all peer's in peers_list
 int broadcast_filetable();
 
+// display tracker filetable
+int display_filetable();
+
 // heartbeat thread continuously checks (every HEARTBEAT_INTERVAL) and remove peers not heard from in a while(= HEARTBEAT_TIMEOUT)
 void* heartbeat(void* arg);
 
