@@ -443,16 +443,19 @@ void compareNode(Node *seekNode) {
                 //download_arg->peerNum = peers;  // ? wrong?
                 int i;
                 for (i = 0; strlen(seekNode->newpeerip[i]) != 0 && i < MAX_PEER_NUM; i++) {
-                    struct sockaddr_in address;
-                    inet_aton(seekNode->newpeerip[i], &address.sin_addr);
-                    download_arg->addr_list[i] = address;
+                    //struct sockaddr_in address;
+                    //inet_aton(seekNode->newpeerip[i], &address.sin_addr);
+                    //download_arg->addr_list[i] = address;
+                    download_arg->addr_list[i].sin_family = AF_INET;
+                    download_arg->addr_list[i].sin_addr.s_addr = inet_addr(seekNode->newpeerip[i]);
+                    download_arg->addr_list[i].sin_port = htons(P2P_PORT);
                 }
                 download_arg->peerNum = i;
                 download_arg->size = seekNode->size;
                 download_arg->timestamp = seekNode->timestamp;
                 
                 modify(download_arg);
-                 
+                
                 // create a ptp_download thread
                 pthread_t ptp_download_thread;
                 pthread_create(&ptp_download_thread, NULL, ptp_download, (void*)download_arg);
@@ -485,9 +488,12 @@ void compareNode(Node *seekNode) {
         //download_arg->peerNum = peers;  // ? wrong?
         int i;
         for (i = 0; strlen(seekNode->newpeerip[i]) != 0 && i < MAX_PEER_NUM; i++) {
-            struct sockaddr_in address;
-            inet_aton(seekNode->newpeerip[i], &address.sin_addr);
-            download_arg->addr_list[i] = address;
+            //struct sockaddr_in address;
+            //inet_aton(seekNode->newpeerip[i], &address.sin_addr);
+            //download_arg->addr_list[i] = address;
+            download_arg->addr_list[i].sin_family = AF_INET;
+            download_arg->addr_list[i].sin_addr.s_addr = inet_addr(seekNode->newpeerip[i]);
+            download_arg->addr_list[i].sin_port = htons(P2P_PORT);
         }
         download_arg->peerNum = i;
         download_arg->size = seekNode->size;
