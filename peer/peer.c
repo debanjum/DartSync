@@ -442,7 +442,7 @@ void compareNode(Node *seekNode) {
                 //int peers = (sizeof(current->newpeerip))/IP_LEN;
                 //download_arg->peerNum = peers;  // ? wrong?
                 int i;
-                for (i = 0; seekNode->newpeerip[i] != NULL && i < MAX_PEER_NUM; i++) {
+                for (i = 0; strlen(seekNode->newpeerip[i]) != 0 && i < MAX_PEER_NUM; i++) {
                     struct sockaddr_in address;
                     inet_aton(seekNode->newpeerip[i], &address.sin_addr);
                     download_arg->addr_list[i] = address;
@@ -484,7 +484,7 @@ void compareNode(Node *seekNode) {
         //int peers = (sizeof(current->newpeerip))/IP_LEN;
         //download_arg->peerNum = peers;  // ? wrong?
         int i;
-        for (i = 0; seekNode->newpeerip[i] != NULL && i < MAX_PEER_NUM; i++) {
+        for (i = 0; strlen(seekNode->newpeerip[i]) != 0 && i < MAX_PEER_NUM; i++) {
             struct sockaddr_in address;
             inet_aton(seekNode->newpeerip[i], &address.sin_addr);
             download_arg->addr_list[i] = address;
