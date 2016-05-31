@@ -206,6 +206,7 @@ int fileDeleted(char *filepath) {
     // loop up this node in filetable
     while (node != NULL){
         if (strcmp(node->name, &filepath[strlen(sync_dir)]) == 0){
+            node->timestamp = (unsigned long int) time(0);  // get current time
             node->type = FILE_DELETE;
             print_filetable();
             peer_sendpkt(conn, filetable, FILE_UPDATE);
