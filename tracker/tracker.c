@@ -268,9 +268,8 @@ int delete_peer(int peer_sockfd, char peer_ip[IP_LEN]) {
     for( temp = peer_head; temp != NULL; temp = temp->next)
 	if (temp->sockfd == peer_sockfd) {
 	    close(temp->sockfd);
-	    temp = temp->next;
+	    break;
 	}
-    
     return 1;
 }
 
@@ -291,8 +290,6 @@ int heard_peer(int peer_sockfd) {
 
 void tracker_stop() {
     printf("\n~>tracker_stop: gracefully closing down tracker\n");
-    pthread_exit(&handshake_thread);
-    pthread_exit(&heartbeat_thread);
     close(peer_sockfd);
     free(ft);
     exit(0);
@@ -337,4 +334,3 @@ int main() {
     
     return 0;
 }
-
