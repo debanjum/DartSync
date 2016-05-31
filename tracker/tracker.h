@@ -37,6 +37,9 @@ int broadcast_filetable();
 // display tracker filetable
 int display_filetable();
 
+// free file table passed
+void free_ft(file_t *ft);
+
 // heartbeat thread continuously checks (every HEARTBEAT_INTERVAL) and remove peers not heard from in a while(= HEARTBEAT_TIMEOUT)
 void* heartbeat(void* arg);
 

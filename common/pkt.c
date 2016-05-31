@@ -64,6 +64,7 @@ int peer_sendpkt(int conn, file_t *ft, int type){
 	    send_pkt->type            = type;
 	    send_pkt->port            = P2P_PORT;
 	    strcpy(send_pkt->peer_ip, getmyip()); // set my(peer) IP
+	    printf("~>peer_sendpkt: sending node %s to tracker\n", send_pkt->file.name);
 	    
 	    if(send(conn, send_pkt, sizeof(ptp_peer_t), 0) < 0) {
 		close(conn);
@@ -163,9 +164,13 @@ int tracker_recvpkt(int conn, ptp_peer_t *pkt)
 {
     //receive first packet containing file_table_size 
     if ( recv(conn, pkt, sizeof(ptp_peer_t), 0) <= 0 ) {
-	printf("~>tracker_recvpkt: error in receiving packet from peer\n");
+	printf("~>[ERROR]tracker_recvpkt: unable to receive packet from peer\n");
 	return -1;
     }
-    printf("~>tracker_recvpkt: successfully received packet from %s\n", pkt->peer_ip); 
+    
+    if( pkt->type == FILE_UPDATE) {
+	printf("~>tracker_recvpkt: recieved node %s from peer %s\n", pkt->file.name, pkt->peer_ip);
+    }
+    
     return 1;
 }

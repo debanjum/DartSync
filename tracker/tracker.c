@@ -7,7 +7,6 @@
 
 #include "tracker.h"
 
-
 pthread_t heartbeat_thread;          // Heartbeat Thread
 pthread_t handshake_thread;          // Handshake Thread
 int peer_sockfd;                     // Peer Socket fd
@@ -69,21 +68,24 @@ void* handshake(void* arg) {
             
             // if received last file Node of peer's file_table
             if ( counter == file_table_size) {
-                counter = -1;                         // reset counter
                 printf("~>handshake: received all file nodes from peer\n");
                 update_filetable(peer_ft);            // update tracker file_table based on information from peer's file_table
-                
-                
-                file_table_size = -1;                 // reset file_table_size, to detect if tracker expects file Node in previous else if
-                free(peer_ft);                        // free peer file table
-                
+
                 if (broadcast_filetable()<0)          // send updated tracker file_table to all peers
                     printf("~>[ERROR]handshake: error in broadcasting filetable\n");
+
+		// cleanup pointers and variables to receive next packet from peer
+		counter = -1;                         // reset counter
+                file_table_size = -1;                 // reset file_table_size, to detect if tracker expects file Node in previous else if
+		free_ft(peer_ft);                     // free peer file_table
             }
         }
         
         else if( recv_pkt->type == KEEP_ALIVE )       // if receive heartbeat message(KEEP_ALIVE)
             heard_peer(connection);                   // update last_heard timestamp of peer with 'connection'
+
+	// reset recv_pkt to receive next packet from peer
+	int zero = 0; memset(recv_pkt, sizeof(recv_pkt), zero);
     }
     
     printf("~>handshake: exiting handshake thread\n");
@@ -145,7 +147,7 @@ int display_filetable() {
 
 // update tracker filetable based on information from peer's filetable
 int update_filetable(file_t *peer_ft) {
-    Node *peer_ftemp, *tracker_ftemp;
+    Node *peer_ftemp, *tracker_ftemp = NULL;
     int file_found = 0, peer_found = 0, index = 0;
     
     printf("~>update_filetable: updating tracker file table\n");
@@ -158,92 +160,83 @@ int update_filetable(file_t *peer_ft) {
             for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
                 
                 // checking if current peer and tracker node name's set
-                if ( tracker_ftemp->name == NULL || peer_ftemp->name == NULL || strlen(tracker_ftemp->name) == 0 || strlen(peer_ftemp->name) == 0)
+                if ( tracker_ftemp->name == NULL || peer_ftemp->name == NULL || strlen(tracker_ftemp->name) == 0 || strlen(peer_ftemp->name) == 0 )
                     printf("~>[ERROR] update_filetable: a tracker or peer node name\n");
                 else
                     printf("tracker_ftemp name: %s\t peer_ftemp name: %s\n", tracker_ftemp->name, peer_ftemp->name);
                 
-                // handle FILE_DELETE type!
                 // if found matching file entry between tracker and peer
-                if ( strcmp(tracker_ftemp->name, peer_ftemp->name) == 0 && tracker_ftemp->type != FILE_DELETE ) {
+                if ( strcmp(tracker_ftemp->name, peer_ftemp->name) == 0 ) {
                     file_found = 1;
-                    if (peer_ftemp->type == FILE_DELETE){
-                        // UPDATE_FILE_PEERS: if matching file is deleted in the peer side, update tracker file_table entry
-                        tracker_ftemp->type = FILE_DELETE;
+		    
+		    // UPDATE_FILE_PEERS: if matching file entry in tracker same as on peer, update tracker file_table entry
+		    if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
+			peer_found = 0;
                         
-                    }
-                    
-                    else{
-                        // UPDATE_FILE_PEERS: if matching file entry in tracker same as on peer, update tracker file_table entry
-                        if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
-                            peer_found = 0;
-                            
-                            // check if peer exists in newpeerip list of peers with latest file version
-                            for( index=0; index<MAX_PEER_NUM && strlen(tracker_ftemp->newpeerip[index])!=0; index++)
-                                if(strcmp(tracker_ftemp->newpeerip[index], peer_ftemp->newpeerip[0])==0) {
-                                    peer_found=1;
-                                    break;
-                                }
-                            
-                            printf("~>update_filetable: %d peers with most recent version of %s\n", index+1, tracker_ftemp->name);
-                            
-                            // if peer doesn't exist in newpeerip list of file node and peer list not full
-                            if(!peer_found && index<MAX_PEER_NUM)
-                                strcpy(tracker_ftemp->newpeerip[index], peer_ftemp->newpeerip[0]);  // append new peer to end of 'newpeerip' string array
-                            
-                            
-                            break;
-                        }
-                        
-                        // UPDATE_FILE_VERSION : if matching file entry in tracker older than on peer, update tracker file_table entry
-                        else if(tracker_ftemp->timestamp < peer_ftemp->timestamp) {
-                            tracker_ftemp->size      = peer_ftemp->size;
-                            tracker_ftemp->timestamp = peer_ftemp->timestamp;
-                            tracker_ftemp->type      = peer_ftemp->type;
-                            tracker_ftemp->status    = peer_ftemp->status;
-                            strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
-                            // clean up ip address list of the old version
-                            for (index = 1; index < MAX_PEER_NUM; index++){
-                                bzero(tracker_ftemp->newpeerip[index], IP_LEN+1);
-                            }
-                            break;
-                        }
-                        
-                    }
-                }
-                
-                // break while pointer still pointing to last element in file_table linked list. Allows appending later if required
-                if (tracker_ftemp->pNext == NULL)
-                    break;
-            }
-        }
-        // ADD_FILE: if no file with current file_name on peer found on tracker's file table, append the file to tracker's file table
-        if(file_found==0) {
+			// check if peer exists in newpeerip list of peers with latest file version
+			for( index=0; index<MAX_PEER_NUM && strlen(tracker_ftemp->newpeerip[index])!=0; index++)
+			    if(strcmp(tracker_ftemp->newpeerip[index], peer_ftemp->newpeerip[0])==0) {
+				printf("~>update_filetable: peer already exists in peer list\n");
+				peer_found=1;
+			    }
+			
+			// if peer doesn't exist in newpeerip list of file node and peer list not full
+			if(!peer_found && index<MAX_PEER_NUM) {
+			    strcpy(tracker_ftemp->newpeerip[index], peer_ftemp->newpeerip[0]);  // append new peer to end of 'newpeerip' string array
+			    printf("~>update_filetable: %d peers with most recent version of %s\n", index+1, tracker_ftemp->name);
+			}
+		    }
+		    
+		    // UPDATE_FILE_VERSION : if matching file entry in tracker older than on peer, update tracker file_table entry
+		    else if(tracker_ftemp->timestamp < peer_ftemp->timestamp) {
+			tracker_ftemp->size      = peer_ftemp->size;
+			tracker_ftemp->timestamp = peer_ftemp->timestamp;
+			tracker_ftemp->type      = peer_ftemp->type;
+			tracker_ftemp->status    = peer_ftemp->status;
+			strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
+
+			// clean up ip address list of the old version
+			for (index = 1; index < MAX_PEER_NUM; index++)
+			    bzero(tracker_ftemp->newpeerip[index], IP_LEN+1);
+		    }
+		    break;
+		}
             
-            //if file_list not empty, head!=NULL case
-            if(tracker_ftemp) {
-                tracker_ftemp->pNext  = calloc(1, sizeof(Node));
+		// break while pointer still pointing to last element in file_table linked list. Allows appending later if required
+		if (tracker_ftemp->pNext == NULL)
+		    break;
+	    }
+	}
+	
+	// ADD_FILE: if no file with current file passed by peer found on tracker's file table, append the file to tracker's file table
+	if(file_found==0) {
+	    
+	    //if file_list not empty, head!=NULL case
+	    if(tracker_ftemp) {
+		tracker_ftemp->pNext  = calloc(1, sizeof(Node));
                 tracker_ftemp         = tracker_ftemp->pNext;
-            }
-            
-            //catches case of empty list, head==NULL case
-            else {
-                printf("~>update_filetable: HEAD was null\n");
-                tracker_ftemp        = calloc(1, sizeof(Node));
+	    }
+	    
+	    //catches case of empty list, head==NULL case
+	    else {
+		printf("~>update_filetable: HEAD was null\n");
+		tracker_ftemp        = calloc(1, sizeof(Node));
                 ft                   = calloc(1, sizeof(file_t));
                 ft->head             = tracker_ftemp;
-            }
-            
-            // add file meta data
-            strcpy(tracker_ftemp->name, peer_ftemp->name);
-            strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
-            tracker_ftemp->size      = peer_ftemp->size;
-            tracker_ftemp->timestamp = peer_ftemp->timestamp;
-            tracker_ftemp->type      = peer_ftemp->type;
-            tracker_ftemp->status    = peer_ftemp->status;
-            //printf("~>update_filetable: added %s from %s to file table\n", ft->head->name);
-        }
+	    }
+	    
+	    // add file meta data
+	    strcpy(tracker_ftemp->name, peer_ftemp->name);
+	    strcpy(tracker_ftemp->newpeerip[0], peer_ftemp->newpeerip[0]);
+	    tracker_ftemp->size      = peer_ftemp->size;
+	    tracker_ftemp->timestamp = peer_ftemp->timestamp;
+	    tracker_ftemp->type      = peer_ftemp->type;
+	    tracker_ftemp->status    = peer_ftemp->status;
+	    tracker_ftemp->pNext     = NULL;
+	    printf("~>update_filetable: added new file %s from %s to file table\n", tracker_ftemp->name, tracker_ftemp->newpeerip[0]);
+	}
     }
+    
     display_filetable();
     printf("~>update_filetable: updated file table successfully\n");
     return 0;
@@ -329,11 +322,22 @@ int heard_peer(int peer_sockfd) {
     return -1;
 }
 
+void free_ft(file_t *ft) {
+    Node *temp = ft->head;
+    // free each node in file table
+    while(temp) {
+	Node* node = temp;
+	temp = temp->pNext;
+	free(node);
+    }
+    // finally free the file table itself
+    free(ft);
+}
 
 void tracker_stop() {
     printf("\n~>tracker_stop: gracefully closing down tracker\n");
     close(peer_sockfd);
-    free(ft);
+    free_ft(ft);
     exit(0);
 }
 
