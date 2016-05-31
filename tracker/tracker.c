@@ -121,7 +121,7 @@ int broadcast_filetable() {
 // update tracker filetable based on information from peer's filetable
 int update_filetable(file_t *peer_ft) {
     Node *peer_ftemp, *tracker_ftemp;
-    int file_found = 0, index, peer_found=0;
+    int file_found = 0, peer_found=0, index, index2;
     
     printf("~>update_filetable: updating tracker file table\n");
     // traverse through each file in peer's file table
@@ -130,6 +130,19 @@ int update_filetable(file_t *peer_ft) {
 	
 	// traverse through each file till before last in tracker's file table
 	if(ft) {
+	    // display tracker file table on every file_update
+	    for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext, index2++ ) {
+		printf("~>update_filetable: %d node filename = %s\n", index2, tracker_ftemp->name);
+		printf("~>update_filetable: %d node type = %d\n", index2, tracker_ftemp->type);
+		printf("~>update_filetable: %d node size = %lu\n", index2, tracker_ftemp->size);
+		printf("~>update_filetable: %d node lastModifyTime = %lu\n", index2, tracker_ftemp->timestamp);
+		printf("~>update_filetable: %d node peer ip =", index2);
+		// check if peer exists in newpeerip list of peers with latest file version
+		for( index=0; index<MAX_PEER_NUM && tracker_ftemp->newpeerip[index]; index++)
+		    printf(" %s,", tracker_ftemp->newpeerip[index]);
+		printf("\n");
+
+	    }
 	    for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
 		
 		if ( !tracker_ftemp->name || !peer_ftemp->name)
