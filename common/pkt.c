@@ -49,6 +49,7 @@ int peer_sendpkt(int conn, file_t *ft, int type){
     }
     
     if(send(conn, send_pkt, sizeof(ptp_peer_t), 0) < 0) {
+	close(conn);
 	free(send_pkt);
 	return -1;
     }
@@ -65,6 +66,7 @@ int peer_sendpkt(int conn, file_t *ft, int type){
 	    strcpy(send_pkt->peer_ip, getmyip()); // set my(peer) IP
 	    
 	    if(send(conn, send_pkt, sizeof(ptp_peer_t), 0) < 0) {
+		close(conn);
 		free(send_pkt);
 		return -1;
 	    }
@@ -85,7 +87,8 @@ int peer_recvpkt(int conn, file_t *ft){
     ptp_tracker_t* pkt = calloc(1, sizeof(ptp_tracker_t));
 
     //receive first packet containing file_table_size
-    if (recv(conn, pkt, sizeof(ptp_tracker_t), 0)<0) {
+    if ( recv(conn, pkt, sizeof(ptp_tracker_t), 0) <= 0 ) {
+	close(conn);
 	free(pkt);
 	return -1;
     }
@@ -94,7 +97,8 @@ int peer_recvpkt(int conn, file_t *ft){
     printf("~>handshake: received file_table of size: %d\n", file_table_size);
     for ( counter=0; counter < file_table_size; counter++ ) {
 	ptp_tracker_t* pkt = calloc(1, sizeof(ptp_tracker_t));
-	if ( recv(conn, pkt, sizeof(ptp_tracker_t), 0) < 0 ) {
+	if ( recv(conn, pkt, sizeof(ptp_tracker_t), 0) <= 0 ) {
+	    close(conn);
 	    free(pkt);
 	    return -1;
 	}
@@ -134,6 +138,7 @@ int tracker_sendpkt(int conn, file_t *ft)
     
     printf("of size %d to peer through socket %d\n", send_pkt->file_table_size, conn);
     if(send(conn, send_pkt, sizeof(ptp_tracker_t), 0) < 0) {
+	close(conn);
 	free(send_pkt);
 	return -1;
     }
@@ -148,6 +153,7 @@ int tracker_sendpkt(int conn, file_t *ft)
 	send_pkt->file_table_size = -1;
 	
 	if(send(conn, send_pkt, sizeof(ptp_tracker_t), 0) < 0) {
+	    close(conn);
 	    free(send_pkt);
 	    return -1;
 	}
@@ -162,8 +168,9 @@ int tracker_sendpkt(int conn, file_t *ft)
 int tracker_recvpkt(int conn, ptp_peer_t *pkt)
 {
     //receive first packet containing file_table_size 
-    if ( recv(conn, pkt, sizeof(ptp_peer_t), 0) < 0 ) {
-	printf("error in receiving packet from peer\n"); 
+    if ( recv(conn, pkt, sizeof(ptp_peer_t), 0) <= 0 ) {
+	printf("error in receiving packet from peer\n");
+	close(conn);
 	free(pkt);
 	return -1;
     }

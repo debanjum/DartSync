@@ -68,7 +68,6 @@ void* handshake(void* arg) {
 	    heard_peer(connection);                   // update last_heard timestamp of peer with 'connection'
     }
     printf("~>handshake: exiting handshake thread\n");
-    free(recv_pkt);
     return 0;
 }
 
@@ -108,7 +107,7 @@ int broadcast_filetable() {
 int update_filetable(file_t *peer_ft) {
     Node *peer_ftemp, *tracker_ftemp;
     int file_found = 0, index, peer_found=0;
-
+    
     printf("~>update_filetable: updating tracker file table\n");
     // traverse through each file in peer's file table
     for( peer_ftemp = peer_ft->head; peer_ftemp != NULL; peer_ftemp = peer_ftemp->pNext ) {
@@ -117,8 +116,14 @@ int update_filetable(file_t *peer_ft) {
 	// traverse through each file till before last in tracker's file table
 	if(ft) {
 	    for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
+		
+		if ( !tracker_ftemp->name || !peer_ftemp->name) {
+		    printf(" ftemp not set\n");
+		}
+		printf("tracker_ftemp name: %s\t peer_ftemp name: %s\n", tracker_ftemp->name, peer_ftemp->name);
 		// if found matching file entry between tracker and peer
-		if (strcmp(tracker_ftemp->name, peer_ftemp->name)==0) {
+		if ( strcmp(tracker_ftemp->name, peer_ftemp->name) == 0 ) {
+		    printf("ASD\n");
 		    // UPDATE_FILE_PEERS: if matching file entry in tracker same as on peer, update tracker file_table entry
 		    if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
 			int peers  = sizeof(tracker_ftemp->newpeerip)/IP_LEN;                  // find no. of peers in 'newpeerip' string array
@@ -157,7 +162,7 @@ int update_filetable(file_t *peer_ft) {
 	    }
 	}
 	// ADD_FILE: if no file with current file_name on peer found on tracker's file table, append the file to tracker's file table
-	if(!file_found) {
+	if(file_found==0) {
 	    
 	    //if file_list not empty, head!=NULL case
 	    if(tracker_ftemp) {
@@ -180,9 +185,10 @@ int update_filetable(file_t *peer_ft) {
 	    tracker_ftemp->timestamp = peer_ftemp->timestamp;
 	    tracker_ftemp->type      = peer_ftemp->type;
 	    tracker_ftemp->status    = peer_ftemp->status;
+	    //printf("~>update_filetable: added %s from %s to file table\n", ft->head->name);
 	}
     }
-    printf("~>update_filetable: updated file_table with %s as head node\n", ft->head->name);
+    printf("~>update_filetable: updated file table successfully\n");
     return 0;
 }
 
