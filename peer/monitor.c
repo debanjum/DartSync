@@ -161,6 +161,12 @@ int fileAdded(char *filepath) {
     while (node != NULL){
         if ((strcmp(node->name, fileInfo->filepath) == 0) && (node->type != FILE_DELETE)){
             printf("~>filemonitor: %s already exists in filetable!\n", node->name);
+            if (node->type == FILE_DOWNLOAD){
+                print_filetable();
+                node->type = FILE_MODIFY;
+                peer_sendpkt(conn, filetable, FILE_UPDATE);
+            }
+            
             //print_filetable();
             return 0;
         }
