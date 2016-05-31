@@ -137,11 +137,8 @@ int tracker_sendpkt(int conn, file_t *ft)
     send_pkt->file_table_size = file_count;
     
     printf("of size %d to peer through socket %d\n", send_pkt->file_table_size, conn);
-    if(send(conn, send_pkt, sizeof(ptp_tracker_t), 0) < 0) {
-	close(conn);
-	free(send_pkt);
+    if(send(conn, send_pkt, sizeof(ptp_tracker_t), 0) < 0)
 	return -1;
-    }
 
     if (!ft)
 	return 1;
@@ -151,16 +148,13 @@ int tracker_sendpkt(int conn, file_t *ft)
 	ptp_tracker_t *send_pkt   = calloc(1, sizeof(ptp_tracker_t));
 	send_pkt->file            = *ftemp;
 	send_pkt->file_table_size = -1;
-	
-	if(send(conn, send_pkt, sizeof(ptp_tracker_t), 0) < 0) {
-	    close(conn);
-	    free(send_pkt);
+      
+	if(send(conn, send_pkt, sizeof(ptp_tracker_t), 0) < 0)
 	    return -1;
-	}
+	
 	printf("~>tracker_sendpkt: sent file %s to peer through socket %d\n", send_pkt->file.name, conn);
 	free(send_pkt);
     }
-    free(send_pkt);
     return 1;
 }
 
@@ -170,8 +164,6 @@ int tracker_recvpkt(int conn, ptp_peer_t *pkt)
     //receive first packet containing file_table_size 
     if ( recv(conn, pkt, sizeof(ptp_peer_t), 0) <= 0 ) {
 	printf("error in receiving packet from peer\n");
-	close(conn);
-	free(pkt);
 	return -1;
     }
     printf("successfully received packet from %s\n", pkt->peer_ip); 
