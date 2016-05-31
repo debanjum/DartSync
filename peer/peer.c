@@ -439,10 +439,10 @@ void compareNode(Node *seekNode) {
     if (current != NULL) {
 
         // compare the timestamps and see if the file needs to be updated to a newer version
-        if (current->timestamp < seekNode->timestamp) {
+        if (current->timestamp <= seekNode->timestamp) {
 
             // if we need to modify the file
-             if (seekNode->status != FILE_DELETE) {
+             if (seekNode->type != FILE_DELETE && current->timestamp < seekNode->timestamp) {
 
                 download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
 
@@ -472,8 +472,10 @@ void compareNode(Node *seekNode) {
              }
 
             // otherwise, we need to delete the file
-            else {
+            else if (seekNode->type == FILE_DELETE && current->type != FILE_DELETE){
 
+                delete(current);
+                
                 // delete the file from the local directory first
                 // current->name should be appended to the current sync folder path
                 char filepath[FILE_NAME_LEN];
@@ -484,7 +486,7 @@ void compareNode(Node *seekNode) {
                     perror("Unable to delete the file");
                 }
 
-                delete(current);
+                
             }
         }
     }
