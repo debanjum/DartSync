@@ -38,7 +38,7 @@ int peer_sendpkt(int conn, file_t *ft, int type){
     send_pkt->file_table_size = -1;
     strcpy(send_pkt->peer_ip, getmyip()); // set my(peer) IP
     
-    printf("send a pkt of type %d from %s\n", type, send_pkt->peer_ip);
+    printf("~>peer_sendpkt: send a pkt of type %d from %s\n", type, send_pkt->peer_ip);
     
     if( type == FILE_UPDATE ) {
 	//find no. of files in file_table
@@ -163,9 +163,9 @@ int tracker_recvpkt(int conn, ptp_peer_t *pkt)
 {
     //receive first packet containing file_table_size 
     if ( recv(conn, pkt, sizeof(ptp_peer_t), 0) <= 0 ) {
-	printf("error in receiving packet from peer\n");
+	printf("~>tracker_recvpkt: error in receiving packet from peer\n");
 	return -1;
     }
-    printf("successfully received packet from %s\n", pkt->peer_ip); 
+    printf("~>tracker_recvpkt: successfully received packet from %s\n", pkt->peer_ip); 
     return 1;
 }
