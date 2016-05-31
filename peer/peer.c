@@ -258,30 +258,31 @@ void* file_monitor(void* arg){
     return 0;
 }
 
-// add a node to our local file table to represent a new file in our local directory
+// add a node to our local file table before downloading this new file from others
 void add(download_arg_t *down) {
     // get the head of the local file table
     Node *current = file_table->head;
-
+    Node *prev = NULL;
     // iterate to the end of the linked list to add at the end
     while (current != NULL) {
+        prev = current;
         current = current->pNext;
     }
 
     // set up the node
     current = (Node *)malloc(sizeof(Node));
+    current->type = FILE_DOWNLOAD;
     current->size = down->size;
     strcpy(current->name,down->filename);
     current->timestamp = down->timestamp;
     current->pNext = NULL;
-
-    // fill in the peer ip addresses
-    for (int i = 0; i < down->peerNum; i++) {
-        strcpy(current->newpeerip[i], inet_ntoa(down->addr_list[i].sin_addr));
-    }
+    prev->pNext = current;
+    
+    // fill in the peer ip addresses, only need to store myip in peer side
+    strcpy(current->newpeerip[0], getmyip());
 }
 
-// modify a node in our local file table to represent changes in our local directory
+// modify a node in our local file table before downloading the latest version from others
 void modify(download_arg_t *down) {
     // get the head of the local file table
     Node *current = file_table->head;
@@ -293,39 +294,15 @@ void modify(download_arg_t *down) {
 
     // modify the node's information
     current->size = down->size;
-    strcpy(current->name, down->filename);
     current->timestamp = down->timestamp;
+    current->type = FILE_DOWNLOAD;
 
-    // modify the peer ip addresses
-    for (int i = 0; i < down->peerNum; i++) {
-        strcpy(current->newpeerip[i], inet_ntoa(down->addr_list[i].sin_addr));
-    }
 }
 
 // delete a node from our local file table to reflect changes in the global directory
 void delete(Node *find) {
-
-    // get the head of the file table
-    Node *current = file_table->head;
-
-    // if the node we want to delete is the head
-    if (strcmp(current->name, find->name) == 0) {
-        Node *toDelete = current;
-        file_table->head = current->pNext;
-        //free(toDelete->name);
-        free(toDelete);
-    }
-
-    else {
-        while (strcmp(current->pNext->name, find->name) != 0) {
-            current = current->pNext;
-        }
-
-        Node *toDelete = current->pNext;
-        current->pNext = current->pNext->pNext;
-        //free(toDelete->name);
-        free(toDelete);
-    }
+    // modify the node's type to FILE_DELETE
+    find->type = FILE_DELETE;
 }
 
 // keep_alive thread sends out heartbeat messages to tracker periodically.
@@ -448,24 +425,27 @@ void compareNode(Node *seekNode) {
         if (current->timestamp < seekNode->timestamp) {
 
             // if we need to modify the file
-             if (current->status != FILE_DELETE) {
+             if (seekNode->status != FILE_DELETE) {
 
                 download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
 
                 // fill in the data for download_arg
                 strcpy(download_arg->filename, current->name);
 
-                
-                int peers = (sizeof(current->newpeerip))/IP_LEN;
-                download_arg->peerNum = peers;  // ? wrong?
-                for (int i = 0; i < peers; i++) {
+                //int peers = (sizeof(current->newpeerip))/IP_LEN;
+                //download_arg->peerNum = peers;  // ? wrong?
+                int i;
+                for (i = 0; seekNode->newpeerip[i] != NULL && i < MAX_PEER_NUM; i++) {
                     struct sockaddr_in address;
-                    inet_aton(current->newpeerip[i], &address.sin_addr);
+                    inet_aton(seekNode->newpeerip[i], &address.sin_addr);
                     download_arg->addr_list[i] = address;
                 }
-                download_arg->size = current->size;
-                download_arg->timestamp = current->timestamp;
-
+                download_arg->peerNum = i;
+                download_arg->size = seekNode->size;
+                download_arg->timestamp = seekNode->timestamp;
+                
+                modify(download_arg);
+                 
                 // create a ptp_download thread
                 pthread_t ptp_download_thread;
                 pthread_create(&ptp_download_thread, NULL, ptp_download, (void*)download_arg);
@@ -486,7 +466,7 @@ void compareNode(Node *seekNode) {
         }
     }
 
-    // we have a new file that we need to download
+    // we have a new file that we need to download, add a new node in file table and set node type to FILE_DOWNLOADED
     else {
 
         download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
@@ -494,16 +474,20 @@ void compareNode(Node *seekNode) {
         // fill in the data for download_arg
         strcpy(download_arg->filename, current->name);
 
-        int peers = (sizeof(current->newpeerip))/IP_LEN;
-        download_arg->peerNum = peers;
-        for (int i = 0; i < peers; i++) {
+        //int peers = (sizeof(current->newpeerip))/IP_LEN;
+        //download_arg->peerNum = peers;  // ? wrong?
+        int i;
+        for (i = 0; seekNode->newpeerip[i] != NULL && i < MAX_PEER_NUM; i++) {
             struct sockaddr_in address;
-            inet_aton(current->newpeerip[i], &address.sin_addr);
+            inet_aton(seekNode->newpeerip[i], &address.sin_addr);
             download_arg->addr_list[i] = address;
         }
-        download_arg->size = current->size;
-        download_arg->timestamp = current->timestamp;
+        download_arg->peerNum = i;
+        download_arg->size = seekNode->size;
+        download_arg->timestamp = seekNode->timestamp;
 
+        add(download_arg);
+        
         // create a ptp_download thread
         pthread_t ptp_download_thread;
         pthread_create(&ptp_download_thread, NULL, ptp_download, (void*)download_arg);

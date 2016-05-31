@@ -44,6 +44,7 @@
 #define FILE_DELETE 5
 #define FILE_OPEN 6
 #define FILE_OPEN_MODIFY 7 // opened in edit mode
+#define FILE_DOWNLOAD 8
 
 #define IS_FILE 1
 #define IS_DIR 2
