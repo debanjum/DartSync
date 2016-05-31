@@ -7,8 +7,13 @@
 
 #include "tracker.h"
 
-tracker_peer_t *peer_head = NULL;   // Peer List
-file_t *ft                = NULL;   // File Table
+
+pthread_t heartbeat_thread;          // Heartbeat Thread
+pthread_t handshake_thread;          // Handshake Thread
+int peer_sockfd;                     // Peer Socket fd
+file_t *ft                 = NULL;   // File Table
+tracker_peer_t *peer_head  = NULL;   // Peer List
+
 
 // main thread for handling communication with individual peers
 void* handshake(void* arg) {
@@ -18,14 +23,20 @@ void* handshake(void* arg) {
     int counter = -1, file_table_size = -1;
     file_t *peer_ft;
     Node *temp;
-    printf("->handshake: handshake thread started\n");    
+    
+    printf("->handshake: handshake thread started\n");
+    
     while( tracker_recvpkt(connection, recv_pkt) > 0 ) {
 	printf("~>handshake: received packet from %s of type %d\n", recv_pkt->peer_ip, recv_pkt->type);
-	if( recv_pkt->type == REGISTER )
-	    tracker_sendpkt(connection, ft);                  // send tracker file_table to peer as response
+	if( recv_pkt->type == REGISTER ) {
+	    // send tracker file_table to peer as response
+	    if (tracker_sendpkt(connection, ft)<0) {
+		delete_peer(connection, recv_pkt->peer_ip);
+		close(connection);
+	    }
+	}
 	
 	else if( recv_pkt->type == FILE_UPDATE ) {
-
 	    // if tracker expects first FILE_UPDATE and peer sent first FILE_UPDATE packet 
 	    if( counter == -1 && recv_pkt->file_table_size != -1)  {
 		printf("~>handshake: received 1ST file node from peer\n");
@@ -60,14 +71,16 @@ void* handshake(void* arg) {
 		free(peer_ft);                        // free peer file table
 		
 		if (broadcast_filetable()<0)          // send updated tracker file_table to all peers
-		    printf("~>handshake: error in broadcasting filetable\n");	
+		    printf("~>[ERROR]handshake: error in broadcasting filetable\n");	
 	    }
 	}
 	
 	else if( recv_pkt->type == KEEP_ALIVE )       // if receive heartbeat message(KEEP_ALIVE)
 	    heard_peer(connection);                   // update last_heard timestamp of peer with 'connection'
     }
+
     printf("~>handshake: exiting handshake thread\n");
+    delete_peer(connection, recv_pkt->peer_ip);
     return 0;
 }
 
@@ -96,8 +109,10 @@ int broadcast_filetable() {
     printf("~>broadcast_filetable: broadcasting updated tracker filetable to all peers\n");
     //traverse through peer_list and transmit file_table to each peer
     for( temp = peer_head; temp != NULL; temp = temp->next )
-	if (tracker_sendpkt(temp->sockfd, ft) < 0)
+	if (tracker_sendpkt(temp->sockfd, ft) < 0) {
+	    delete_peer(temp->sockfd, temp->ip);
 	    return -1;
+	}
     
     return 1;
 }
@@ -117,13 +132,14 @@ int update_filetable(file_t *peer_ft) {
 	if(ft) {
 	    for( tracker_ftemp = ft->head; tracker_ftemp != NULL; tracker_ftemp = tracker_ftemp->pNext ) {
 		
-		if ( !tracker_ftemp->name || !peer_ftemp->name) {
-		    printf(" ftemp not set\n");
-		}
-		printf("tracker_ftemp name: %s\t peer_ftemp name: %s\n", tracker_ftemp->name, peer_ftemp->name);
+		if ( !tracker_ftemp->name || !peer_ftemp->name)
+		    printf("~>[ERROR] update_filetable: a tracker or peer node name\n");
+		else
+		    printf("tracker_ftemp name: %s\t peer_ftemp name: %s\n", tracker_ftemp->name, peer_ftemp->name);
+		
 		// if found matching file entry between tracker and peer
 		if ( strcmp(tracker_ftemp->name, peer_ftemp->name) == 0 ) {
-		    printf("ASD\n");
+		    
 		    // UPDATE_FILE_PEERS: if matching file entry in tracker same as on peer, update tracker file_table entry
 		    if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
 			int peers  = sizeof(tracker_ftemp->newpeerip)/IP_LEN;                  // find no. of peers in 'newpeerip' string array
@@ -273,13 +289,24 @@ int heard_peer(int peer_sockfd) {
 }
 
 
+void tracker_stop() {
+    pthread_exit(&handshake_thread);
+    pthread_exit(&heartbeat_thread);
+    close(peer_sockfd);
+    free(ft);
+}
+
+
 int main() {
-    int peer_sockfd;
     struct sockaddr_in tracker_addr;
     int connection;
     struct sockaddr_in peer_addr;
     socklen_t peer_addr_len = sizeof(struct sockaddr_in);
-    
+
+
+    // register a signal handler which is sued to terminate the process
+    signal(SIGINT, tracker_stop);
+
     peer_sockfd = socket(AF_INET, SOCK_STREAM, 0); 
     if(peer_sockfd<0) 
 	return -1;
@@ -296,7 +323,6 @@ int main() {
     
     printf("listening on %d for peer connections\n", HANDSHAKE_PORT);
 
-    pthread_t heartbeat_thread;
     pthread_create(&heartbeat_thread, NULL, heartbeat, NULL);
 
     while((connection = accept(peer_sockfd, (struct sockaddr*)&peer_addr, &peer_addr_len))>0) {
@@ -305,7 +331,6 @@ int main() {
 	add_peer(connection, inet_ntoa(peer_addr.sin_addr));
 	
 	// Create and hand-off communication with peer to a separate handshake thread
-	pthread_t handshake_thread;
 	pthread_create(&handshake_thread, NULL, handshake, (void*)&connection);
     }
     
