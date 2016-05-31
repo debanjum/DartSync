@@ -276,7 +276,13 @@ void add(download_arg_t *down) {
     strcpy(current->name,down->filename);
     current->timestamp = down->timestamp;
     current->pNext = NULL;
-    prev->pNext = current;
+    
+    if (prev == NULL){
+        file_table->head = current;
+    }
+    else {
+        prev->pNext = current;
+    }
     
     // fill in the peer ip addresses, only need to store myip in peer side
     strcpy(current->newpeerip[0], getmyip());
@@ -473,7 +479,7 @@ void compareNode(Node *seekNode) {
         download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
 
         // fill in the data for download_arg
-        strcpy(download_arg->filename, current->name);
+        strcpy(download_arg->filename, seekNode->name);
 
         //int peers = (sizeof(current->newpeerip))/IP_LEN;
         //download_arg->peerNum = peers;  // ? wrong?
