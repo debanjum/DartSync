@@ -116,7 +116,7 @@ void* piece_download(void* arg){
     printf("piece_arg->size = %d\n", size);
     char temp_filename[FILE_NAME_LEN];
     memset(temp_filename, 0, FILE_NAME_LEN);
-    sprintf(temp_filename, "%s_%d", filename, request_pkt->pieceNum);
+    sprintf(temp_filename, "%s.%s_%d", readConfigFile("config.data"), filename, request_pkt->pieceNum);
     
     FILE* fp = fopen(temp_filename, "a");
     if (fp == NULL){
@@ -213,11 +213,15 @@ void* ptp_download(void* arg){
     printf("successfully received all pieces!\n");
     // put all recieved pieces together
     // ? use temp file: will be noticed by inotify!! use buffer instead
-    FILE* fp = fopen(filename, "w");
+    char filepath[FILE_NAME_LEN];
+    strcpy(filepath, readConfigFile("config.data"));
+    strcat(filepath, filename);
+    FILE* fp = fopen(filepath, "w");
     for (int i = 0; i < peerNum; i++){
         char temp_filename[FILE_NAME_LEN];
         memset(temp_filename, 0, FILE_NAME_LEN);
-        sprintf(temp_filename, "%s_%d", filename, i);
+        
+        sprintf(temp_filename, "%s.%s_%d", readConfigFile("config.data"), filename, i);
         FILE* tmp = fopen(temp_filename, "r");
         if (tmp == NULL){
             printf("cannot open %s!\n", temp_filename);
@@ -230,6 +234,12 @@ void* ptp_download(void* arg){
         //char buffer[fileLen];
         fread(buffer, fileLen, 1, tmp);
         fclose(tmp);
+        
+        // delete temp files
+        int ret = remove(temp_filename);
+        if (ret != 0) {
+            perror("Unable to delete the file");
+        }
         
         fwrite(buffer, fileLen, 1, fp);
         printf("going to free buffer!\n");
@@ -466,7 +476,10 @@ void compareNode(Node *seekNode) {
 
                 // delete the file from the local directory first
                 // current->name should be appended to the current sync folder path
-                int ret = remove(current->name);
+                char filepath[FILE_NAME_LEN];
+                strcpy(filepath, readConfigFile("config.data"));
+                strcat(filepath, current->name);
+                int ret = remove(filepath);
                 if (ret != 0) {
                     perror("Unable to delete the file");
                 }
