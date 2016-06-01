@@ -47,5 +47,10 @@ void* file_monitor(void* arg);
 // keep_alive thread sends out heartbeat messages to tracker periodically.
 void* keep_alive(void* arg);
 
+// compares tracker filetable with peer filetable and syncs to latest global version
+void compareNode(Node *seekNode);
+
+// this function is used to start connection to tracker, send REGISTER pkt and wait to ACCEPT 1st trackerFileTable.
+int connect_to_tracker(file_t* trackerFileTable);
 
 #endif /* peer_h */

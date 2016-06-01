@@ -400,8 +400,9 @@ void peer_stop(){
 }
 
 // this function is used to start connection to tracker, send REGISTER pkt and wait for ACCEPT pkt.
-int connect_to_tracker(){
+int connect_to_tracker(file_t* trackerFileTable){
     int sockfd;
+    
     // create socket for peer-tracker communications
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 6)) == -1) {
         perror("socket creation error\n");
@@ -432,12 +433,12 @@ int connect_to_tracker(){
     
     // wait for ACCEPT pkt from tracker
     printf("accept FILE_TABLE in tracker response");
-    if( peer_recvpkt(sockfd, file_table) < 0 ) {
+    if( peer_recvpkt(sockfd, trackerFileTable) < 0 ) {
 	printf("...fail\n");
 	return -1;
     }
     printf("...pass\n");
-    
+
     return sockfd;
 }
 
@@ -552,14 +553,15 @@ int main(int argc, const char * argv[]) {
     file_table = filetable_create();
     
     // connect to tracker, register and accept
-    tracker_conn = connect_to_tracker();
+    file_t *trackerFileTable = (file_t *)calloc(1, sizeof(file_t));
+    tracker_conn = connect_to_tracker(trackerFileTable);
     if(tracker_conn < 0) {
 	perror("connect_to_tracker");
 	return -1;
     }
     printf("Peer: successfully connect to tracker!\n");
     
-    // initialize listen_to_peer thread
+    // initialize listen_to_peer thread and get initial trackerFileTable in ACCEPT
     ptp_listen_thread_init();
     
     // initialize file_monitor thread
@@ -569,7 +571,30 @@ int main(int argc, const char * argv[]) {
     // initialize keep_alive thread
     pthread_t keep_alive_thread;
     pthread_create(&keep_alive_thread, NULL, keep_alive, (void*)0);
+
+    // iterate through nodes in tracker's file table and find the files to be updated
+    if(trackerFileTable) {
+	if(trackerFileTable->head) { 
+	    Node *current = trackerFileTable->head;
+	    while (current != NULL) {
+		compareNode(current);
+		current = current->pNext;
+	    }
+	
+	    // free the table
+	    Node *ptr = trackerFileTable->head;
+	    // if the pointer does not point to NULL
+	    if (ptr != NULL) {
+		//free(ptr->name);    // free the name of the file
+		Node *current = ptr;
+		ptr = ptr->pNext;   // get the next node
+		free(current);  // free the current node
+	    }
+	}
+    }
     
+    free(trackerFileTable);
+
     // (file_monitor thread) send a HANDSHAKE pkt filled with file table
     
     // (main thread) 1.keep receiving BROADCAST pkt from tracker
@@ -584,8 +609,7 @@ int main(int argc, const char * argv[]) {
 	    peer_stop();
 	    return 0;
 	}
-	    
-
+	
         // iterate through nodes in tracker's file table and find the files to be updated
         Node *current = trackerFileTable->head;
         while (current != NULL) {
@@ -594,7 +618,6 @@ int main(int argc, const char * argv[]) {
         }
 
         // free the table
-
         Node *ptr = trackerFileTable->head;
         // if the pointer does not point to NULL
         if (ptr != NULL) {
