@@ -242,10 +242,10 @@ void* ptp_download(void* arg){
             printf("Now resuming from partial download\n");
             fflush(stdout);
         }
-    }
 
-    fclose(temp);
-    system("rm tmpfiles");
+        fclose(temp);
+        remove("tmpfiles");
+    }
 
     if (download_arg->peerNum == 1){
         peerNum = 1;
@@ -392,7 +392,6 @@ void add(download_arg_t *down) {
     else {
         prev->pNext = current;
     }
-    printf("~>add: tracker node: %s,\ttype: %d,\tsize: %lu,\ttimestamp:%lu\n", current->name, current->type, current->size, current->timestamp);
     
     // fill in the peer ip addresses, only need to store myip in peer side
     strcpy(current->newpeerip[0], getmyip());
@@ -412,8 +411,7 @@ void modify(download_arg_t *down) {
     current->size = down->size;
     current->timestamp = down->timestamp;
     current->type = FILE_DOWNLOADING;
-    
-    printf("~>add: tracker node: %s,\ttype: %d,\tsize: %lu,\ttimestamp:%lu\n", current->name, current->type, current->size, current->timestamp);
+
 }
 
 // delete a node from our local file table to reflect changes in the global directory
@@ -547,6 +545,7 @@ void compareNode(Node *seekNode) {
             // if we need to modify the file
             if (seekNode->size>0 && current->type != FILE_DOWNLOADING && seekNode->type != FILE_DELETE && (current->timestamp < seekNode->timestamp || (current->timestamp == seekNode->timestamp && current->size < seekNode->size))) {
                 
+                
                 download_arg_t* download_arg = (download_arg_t *)calloc(1, sizeof(download_arg_t));
 
                 // fill in the data for download_arg
@@ -576,7 +575,7 @@ void compareNode(Node *seekNode) {
 
             // otherwise, we need to delete the file
             else if (seekNode->type == FILE_DELETE && current->type != FILE_DELETE){
-		current->timestamp = seekNode->timestamp;   // update timestamp of node to be deleted
+
                 delete(current);
                 
                 // delete the file from the local directory first
