@@ -7,6 +7,9 @@
 //
 
 #include "p2p.h"
+#include "datacompress.h"
+#include <stdio.h>
+#include <string.h>
 
 // Peer sends data packet to another peer
 int ptp_sendpkt(int conn, ptp_data_pkt_t *pkt){
@@ -102,6 +105,24 @@ int upload_send(int conn, char* file_path, int pieceNum, unsigned long offset, u
         char *dataPtr = buffer;
         int length = (remainder_len > 0 && i == pkt_count - 1)? remainder_len : MAX_DATA_LEN;
         memmove(pkt->data, &dataPtr[i * MAX_DATA_LEN], length);
+
+        // compress the piece of data
+        unsigned long int sourceLen = length;
+        unsigned long int compLen = 0;
+        char *source = (char *)malloc(length);
+        strcpy(source, pkt->data);
+
+        printf("compressing the data that will be sent\n");
+
+        char *compPiece = compressString(source, sourceLen, &compLen);
+        memset(&pkt->data[0], 0, sizeof(pkt->data));
+        strcpy(pkt->data, compPiece);
+
+        // first send the length of the compressed file piece
+        if (send(conn, &compLen, sizeof(unsigned long int), 0) < 0) {
+            perror("Failed to send the compressed file size");
+            return -1;
+        }
         
         // filename? timestamp?
         pkt->pieceNum = pieceNum;
