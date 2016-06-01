@@ -63,7 +63,7 @@ void printDirTree(DirTree *dirTree) {
 
 // add a subdir to dir tree
 void addDirNode(DirTree *dirTree, const char *dirpath) {
-    DirNode *node = (DirNode *)malloc(sizeof(DirNode));
+    DirNode *node = (DirNode *)calloc(1, sizeof(DirNode));
     strcpy(node->dirpath, dirpath);
     strcat(node->dirpath, "/");
     node->next = NULL;
@@ -117,7 +117,7 @@ int print_entry(const char *filepath, const struct stat *info,
 // this function is used for recursively traversing directories.
 int print_directory_tree(const char *dirpath) {
     // initialize directory tree
-    dir_tree = (DirTree *) malloc(sizeof(DirTree));
+    dir_tree = (DirTree *) calloc(1, sizeof(DirTree));
     dirNum = 0;
     
     // file tree walk
@@ -137,7 +137,7 @@ FileInfo *getFileInfo(char *filepath) {
     FileInfo *fileInfo = NULL;
     struct stat statbuf;
     if (stat(filepath, &statbuf) != -1) {
-        fileInfo = (FileInfo *)malloc(sizeof(FileInfo));
+        fileInfo = (FileInfo *)calloc(1, sizeof(FileInfo));
         long fileSize = statbuf.st_size;
         
         fileInfo->size = fileSize;
@@ -175,7 +175,7 @@ int fileAdded(char *filepath) {
     }
     
     // add this node to filetable
-    Node *filenode = (Node *)malloc(sizeof(Node));
+    Node *filenode = (Node *)calloc(1, sizeof(Node));
     filenode->status = IS_FILE;
     strcpy(filenode->name, fileInfo->filepath);
     filenode->type = FILE_CREATE;

@@ -57,7 +57,7 @@ int upload_send(int conn, char* file_path, int pieceNum, unsigned long offset, u
     int fileLen = (int)size;
     printf("ptp_upload: sending a piece of file [%s], fileLen = %d\n", file_path, fileLen);
     
-    char *buffer = (char *)malloc(fileLen);
+    char *buffer = (char *)calloc(1, fileLen);
     fseek(fp, offset, SEEK_SET);
     fread(buffer, fileLen, 1, fp);
     fclose(fp);

@@ -13,7 +13,7 @@ file_t *file_table;
 
 // this function is used to initialize file table
 file_t *filetable_create(){
-    file_t *ft = (file_t *)malloc(sizeof(file_t));
+    file_t *ft = (file_t *)calloc(1, sizeof(file_t));
     ft->head = NULL;
     return ft;
 }
@@ -27,7 +27,7 @@ void* ptp_listening(void* arg){
     
     while (1){
         struct sockaddr_in *client_addr;
-        client_addr = (struct sockaddr_in *)malloc(sizeof(struct sockaddr_in));
+        client_addr = (struct sockaddr_in *)calloc(1, sizeof(struct sockaddr_in));
         if ((conn = accept(ptp_listen_fd, (struct sockaddr *)(client_addr), &sin_size)) == -1) {
             perror("accept error\n");
             exit(1);
@@ -36,7 +36,7 @@ void* ptp_listening(void* arg){
         
         // receive a data request pkt from remote peer and parse the request info
         char filename[FILE_NAME_LEN];
-        upload_arg_t *arg = (upload_arg_t *)malloc(sizeof(upload_arg_t));
+        upload_arg_t *arg = (upload_arg_t *)calloc(1, sizeof(upload_arg_t));
         arg->sockfd = conn;
         recv_data_request(conn, filename, &arg->pieceNum, &arg->offset, &arg->size);
         
@@ -99,7 +99,7 @@ void* piece_download(void* arg){
     printf("Peer: successfully connect to ptp_listening thread of remote peer!\n");
 
     // send data request through *sockfd*, specify filename and pieceNum
-    ptp_request_t *request_pkt = (ptp_request_t *)malloc(sizeof(ptp_request_t));
+    ptp_request_t *request_pkt = (ptp_request_t *)calloc(1, sizeof(ptp_request_t));
     strcpy(request_pkt->filename, filename);
     request_pkt->pieceNum = piece_arg->pieceNum;
     request_pkt->offset = piece_arg->offset;
@@ -193,7 +193,7 @@ void* ptp_download(void* arg){
     // download one file from multiple peers using multi-threading
     pthread_t tid[peerNum];
     for (int i = 0; i < peerNum; i++){
-        piece_download_arg_t *piece_arg = (piece_download_arg_t *)malloc(sizeof(piece_download_arg_t));
+        piece_download_arg_t *piece_arg = (piece_download_arg_t *)calloc(1, sizeof(piece_download_arg_t));
         strcpy(piece_arg->filename, filename);
         memmove(&piece_arg->peer_addr, &peer_addr_list[i], sizeof(struct sockaddr_in));
         piece_arg->pieceNum = i;
@@ -230,7 +230,7 @@ void* ptp_download(void* arg){
         int fileLen = ftell(tmp);
         fseek(tmp, 0, SEEK_SET);
         printf("fileLen = %d\n", fileLen);
-        char *buffer = (char*)malloc(fileLen);
+        char *buffer = (char*)calloc(1, fileLen);
         //char buffer[fileLen];
         fread(buffer, fileLen, 1, tmp);
         fclose(tmp);
@@ -280,7 +280,7 @@ void add(download_arg_t *down) {
     }
 
     // set up the node
-    current = (Node *)malloc(sizeof(Node));
+    current = (Node *)calloc(1, sizeof(Node));
     current->type = FILE_DOWNLOAD;
     current->size = down->size;
     strcpy(current->name,down->filename);
@@ -444,7 +444,7 @@ void compareNode(Node *seekNode) {
             // if we need to modify the file
              if (seekNode->type != FILE_DELETE && current->timestamp < seekNode->timestamp) {
 
-                download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
+                download_arg_t* download_arg = (download_arg_t *)calloc(1, sizeof(download_arg_t));
 
                 // fill in the data for download_arg
                 strcpy(download_arg->filename, current->name);
@@ -494,7 +494,7 @@ void compareNode(Node *seekNode) {
     // we have a new file that we need to download, add a new node in file table and set node type to FILE_DOWNLOADED
     else {
 
-        download_arg_t* download_arg = (download_arg_t *)malloc(sizeof(download_arg_t));
+        download_arg_t* download_arg = (download_arg_t *)calloc(1, sizeof(download_arg_t));
 
         // fill in the data for download_arg
         strcpy(download_arg->filename, seekNode->name);
@@ -560,7 +560,7 @@ int main(int argc, const char * argv[]) {
     // 4. (ptp_download thread) send HANDSHAKE pkt to tracker
     while (1){
         // receive file table from tracker
-        file_t *trackerFileTable = (file_t *)malloc(sizeof(file_t));
+        file_t *trackerFileTable = (file_t *)calloc(1, sizeof(file_t));
         peer_recvpkt(tracker_conn, trackerFileTable);
 
         // iterate through nodes in tracker's file table and find the files to be updated
