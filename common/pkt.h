@@ -40,11 +40,17 @@ int tracker_recvpkt(int connection, ptp_peer_t *pkt);
 // Tracker sends packet to peer with its current file table wrapped
 int tracker_sendpkt(int conn, file_t *ft);
 
-// Peer wraps its file table and request type into a packet and sends it to the tracker    
+// Peer wraps its file table and request type into a packet and sends it to the tracker
 int peer_sendpkt(int conn, file_t *ft, int type);
 
 // Peer receives packet from tracker and unpacks trackers file table 
 int peer_recvpkt(int conn, file_t *ft);
 
-char *getmyip();
+// reliable packet receiver for tracker
+int tracker_receiver(int conn, ptp_peer_t *pkt, int bufsize);
+
+// reliable packet receiver for peer
+int peer_receiver(int conn, ptp_tracker_t *pkt, int bufsize);
+
+char* getmyip();
 #endif // pkt_h

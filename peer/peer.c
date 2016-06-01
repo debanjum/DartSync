@@ -376,6 +376,7 @@ void ft_destroy(){
 }
 
 void peer_stop(){
+    printf("\n~>peer_stop: gracefully shutting down peer\n");
     ft_destroy();
     close(ptp_listen_fd);
     close(tracker_conn);
@@ -561,7 +562,12 @@ int main(int argc, const char * argv[]) {
     while (1){
         // receive file table from tracker
         file_t *trackerFileTable = (file_t *)calloc(1, sizeof(file_t));
-        peer_recvpkt(tracker_conn, trackerFileTable);
+        if( peer_recvpkt(tracker_conn, trackerFileTable) < 0 ) {
+	    printf("~>main: error in receiving packet from tracker\n");
+	    peer_stop();
+	    return 0;
+	}
+	    
 
         // iterate through nodes in tracker's file table and find the files to be updated
         Node *current = trackerFileTable->head;

@@ -18,3 +18,5 @@ clean:
 	rm -rf tracker/*.o
 	rm -rf peer/peer
 	rm -rf tracker/tracker
+	rm -rf core*
+	rm -rf peer/core*

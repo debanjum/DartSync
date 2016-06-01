@@ -17,27 +17,27 @@ tracker_peer_t *peer_head  = NULL;   // Peer List
 // main thread for handling communication with individual peers
 void* handshake(void* arg) {
     int connection = *(int *)arg;
-    ptp_peer_t* recv_pkt = (ptp_peer_t *)calloc(1,sizeof(ptp_peer_t));
+    ptp_peer_t* recv_pkt = (ptp_peer_t *)calloc(1, sizeof(ptp_peer_t));
     
     int counter = -1, file_table_size = -1;
     file_t *peer_ft;
-    Node *temp;
+    Node *temp = NULL;
     
     printf("->handshake: handshake thread started\n");
     
     while( tracker_recvpkt(connection, recv_pkt) > 0 ) {
+	
         printf("~>handshake: received packet from %s of type %d\n", recv_pkt->peer_ip, recv_pkt->type);
+	
         if( recv_pkt->type == REGISTER ) {
             // send tracker file_table to peer as response
             if (tracker_sendpkt(connection, ft)<0) {
                 delete_peer(connection, recv_pkt->peer_ip);
-                close(connection);
             }
         }
         
         else if( recv_pkt->type == FILE_UPDATE ) {
             // if tracker expects first FILE_UPDATE and peer sent first FILE_UPDATE packet
-            //printf("~>handshake: recv pkt counter = %d\n", counter);
             if( counter == -1 && recv_pkt->file_table_size != -1)  {
                 file_table_size = recv_pkt->file_table_size;        // first FILE_UPDATE packet contains only no. of nodes in linked list
                 printf("~>handshake: received 1ST file node from peer, filetable size = %d\n", file_table_size);
@@ -47,20 +47,17 @@ void* handshake(void* arg) {
             
             // if tracker expects file Node and peer sent packet with file Node
             else if(counter < file_table_size && recv_pkt->file_table_size == -1 ) {
-                // if second FILE_UPDATE packet used to set linked list HEAD
+                // if second FILE_UPDATE packet set linked list HEAD
                 if( counter == 0 ) {
                     temp           = calloc(1, sizeof(Node));
                     *temp          = recv_pkt->file;
                     peer_ft->head  = temp;
-                    //for( counter2 = 0; counter2 < MAX_PEER_NUM; counter2++) { bzero(temp->newpeerip[counter2], IP_LEN+1); }
                     printf("~>handshake: received No.%d file node from peer\n", counter);
                 }
                 else {
                     temp->pNext    = calloc(1, sizeof(Node));
                     *temp->pNext   = recv_pkt->file;
                     temp           = temp->pNext;
-                    //for( counter2 = 0; counter2 < MAX_PEER_NUM; counter2++) { bzero(temp->newpeerip[counter2], IP_LEN+1); }
-                    
                     printf("~>handshake: received No.%d file node from peer\n", counter);
                 }
                 counter++;
@@ -83,9 +80,6 @@ void* handshake(void* arg) {
         
         else if( recv_pkt->type == KEEP_ALIVE )       // if receive heartbeat message(KEEP_ALIVE)
             heard_peer(connection);                   // update last_heard timestamp of peer with 'connection'
-
-	// reset recv_pkt to receive next packet from peer
-	int zero = 0; memset(recv_pkt, sizeof(recv_pkt), zero);
     }
     
     printf("~>handshake: exiting handshake thread\n");
@@ -197,7 +191,7 @@ int update_filetable(file_t *peer_ft) {
 
 			// clean up ip address list of the old version
 			for (index = 1; index < MAX_PEER_NUM; index++)
-			    bzero(tracker_ftemp->newpeerip[index], IP_LEN+1);
+			    memset(tracker_ftemp->newpeerip[index], 0, IP_LEN+1);
 		    }
 		    break;
 		}
@@ -269,6 +263,7 @@ int add_peer(int peer_sockfd, char ip[IP_LEN+1]) {
     temp->last_time_stamp = (unsigned long)time(NULL);   // peer's current timestamp
     temp->sockfd          = peer_sockfd;                 // peer's connection file descriptor
     temp->next            = NULL;
+
     printf("added peer %s to peer_list\n", temp->ip);
     return 1;
 }
@@ -294,17 +289,30 @@ int delete_peer(int peer_sockfd, char peer_ip[IP_LEN+1]) {
                     if (counter - 1 > index)
                         strcpy(tracker_ftemp->newpeerip[index], tracker_ftemp->newpeerip[counter-1]);
                     // and set overwriting IP index in peer list to NULL
-                    bzero(tracker_ftemp->newpeerip[counter-1], IP_LEN+1);
+                    memset(tracker_ftemp->newpeerip[counter-1], 0, IP_LEN+1);
                 }
             }
         }
     }
-    //search through peers linked_list for peer with peer_sockfd and delete it
-    for( temp = peer_head; temp != NULL; temp = temp->next)
-        if (temp->sockfd == peer_sockfd) {
-            close(temp->sockfd);
-            break;
+    
+    // search through peers linked_list for peer with peer_sockfd and delete it
+    for( temp = peer_head; temp->next != NULL; temp = temp->next) {
+	if( temp == peer_head && temp->sockfd == peer_sockfd ) {
+	    close(temp->sockfd);
+	    tracker_peer_t *node = temp;
+	    temp = temp->next;
+	    free(node);
+	    break;
+	}
+        else if (temp->next->sockfd == peer_sockfd) {
+            close(temp->next->sockfd);
+	    tracker_peer_t *node = temp->next;
+	    temp->next = temp->next->next;
+	    free(node);
+	    break;
         }
+    }
+
     return 1;
 }
 
@@ -335,7 +343,7 @@ void free_ft(file_t *ft) {
 }
 
 void tracker_stop() {
-    printf("\n~>tracker_stop: gracefully closing down tracker\n");
+    printf("\n~>tracker_stop: gracefully shutting down tracker\n");
     close(peer_sockfd);
     free_ft(ft);
     exit(0);
@@ -351,7 +359,7 @@ int main() {
     // register a signal handler which is sued to terminate the process
     signal(SIGINT, tracker_stop);
     
-    peer_sockfd = socket(AF_INET, SOCK_STREAM, 0); 
+    peer_sockfd = socket(AF_INET, SOCK_STREAM, 6);
     if(peer_sockfd<0) 
         return -1;
     
