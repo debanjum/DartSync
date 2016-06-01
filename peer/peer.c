@@ -160,25 +160,32 @@ void* piece_download(void* arg){
         ptp_data_pkt_t pkt;
         memset(&pkt, 0, sizeof(ptp_data_pkt_t));
         printf("ready to receive data pkt id = %d!\n", i);
-        ptp_recvpkt(sockfd, &pkt);
-        // extract data from pkt and save it into a temporary file
-        printf("successfully received data pkt id = %d!\n", i);
+        
         //printf("pkt->size = %lu\n", pkt.size);
         //printf("pkt->pieceNum = %d\n", pkt.pieceNum);
 
+        // receive the compressed file piece
+        char *source = calloc(compLen, sizeof(char));
+        if (recv(sockfd, source, compLen, 0) < 0) {
+            printf("Failed to receive the compressed file piece\n");
+            exit(1);
+        }
+
+        printf("successfully received data pkt id = %d!\n", i);
         // decompress the file piece that was received
         unsigned long int destLen = MAX_DATA_LEN;
-        char *source = (char *)malloc(sizeof(pkt.data));
-        strncpy(source, pkt.data, compLen);
+        //strcpy(source, pkt.data);
 
         printf("currently decompressing the compressed data\n");
 
         char *decompString = decompressString(source, compLen, &destLen);
-        memset(&pkt.data[0], 0, sizeof(pkt.data));
-        strcpy(pkt.data, decompString);
+
+        //memset(&pkt.data, 0, sizeof(pkt.data));
+        //strncpy(pkt.data, decompString, pkt.size);
 
         nanosleep((const struct timespec[]){{0, RECV_INTERVAL}}, NULL);
-        memmove(&buffer[i * MAX_DATA_LEN], pkt.data, pkt.size);
+        //memmove(&buffer[i * MAX_DATA_LEN], pkt.data, pkt.size);
+        memmove(&buffer[i * MAX_DATA_LEN], decompString, strlen(decompString));
         //free(pkt);
     }
     
