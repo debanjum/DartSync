@@ -161,6 +161,9 @@ int fileAdded(char *filepath) {
     while (node != NULL){
         if ((strcmp(node->name, fileInfo->filepath) == 0) && (node->type != FILE_DELETE)){
             printf("~>filemonitor: %s already exists in filetable!\n", node->name);
+            if (node->type == FILE_DOWNLOADING){
+                return 0;
+            }
             if (node->type == FILE_DOWNLOAD){
                 print_filetable();
                 node->type = FILE_MODIFY;
@@ -168,6 +171,14 @@ int fileAdded(char *filepath) {
             }
             
             //print_filetable();
+            return 0;
+        }
+        else if ((strcmp(node->name, fileInfo->filepath) == 0) && node->type == FILE_DELETE) {
+            node->type = FILE_CREATE;
+            node->size = fileInfo->size;
+            node->timestamp = fileInfo->lastModifyTime;
+            print_filetable();
+            peer_sendpkt(conn, filetable, FILE_UPDATE);
             return 0;
         }
         prev = node;
@@ -227,7 +238,10 @@ int fileModified(char *filepath) {
     while (node != NULL){
         if (strcmp(node->name, fileInfo->filepath) == 0) {
             // check FILE_DOWNLOAD type before updating file table, then set type to anything else other than FILE_DOWNLOAD
-            if (node->type == FILE_DOWNLOAD){
+            if (node->type == FILE_DOWNLOADING){
+                return 0;
+            }
+            else if (node->type == FILE_DOWNLOAD){
                 printf("~>filemonitor: %s is downloaded from other peers\n", node->name);
                 node->type = FILE_MODIFY;
                 print_filetable();

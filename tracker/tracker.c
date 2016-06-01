@@ -164,7 +164,7 @@ int update_filetable(file_t *peer_ft) {
                     file_found = 1;
 		    
 		    // UPDATE_FILE_PEERS: if matching file entry in tracker same as on peer, update tracker file_table entry
-		    if(tracker_ftemp->timestamp == peer_ftemp->timestamp) {
+            if(tracker_ftemp->timestamp == peer_ftemp->timestamp && tracker_ftemp->size == peer_ftemp->size) {
 			peer_found = 0;
                         
 			// check if peer exists in newpeerip list of peers with latest file version
@@ -182,7 +182,7 @@ int update_filetable(file_t *peer_ft) {
 		    }
 		    
 		    // UPDATE_FILE_VERSION : if matching file entry in tracker older than on peer, update tracker file_table entry
-		    else if(tracker_ftemp->timestamp < peer_ftemp->timestamp) {
+            else if ((tracker_ftemp->timestamp == peer_ftemp->timestamp && tracker_ftemp->size < peer_ftemp->size) || (tracker_ftemp->timestamp < peer_ftemp->timestamp)) {
 			tracker_ftemp->size      = peer_ftemp->size;
 			tracker_ftemp->timestamp = peer_ftemp->timestamp;
 			tracker_ftemp->type      = peer_ftemp->type;

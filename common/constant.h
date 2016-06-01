@@ -45,6 +45,7 @@
 #define FILE_OPEN 6
 #define FILE_OPEN_MODIFY 7 // opened in edit mode
 #define FILE_DOWNLOAD 8
+#define FILE_DOWNLOADING 9
 
 #define IS_FILE 1
 #define IS_DIR 2
@@ -65,7 +66,7 @@ typedef struct node{
     // is file or directory
     short status;
     //the size of the file
-    long size;
+    unsigned long size;
     //the name of the file
     char name[FILE_NAME_LEN];
     //the timestamp when the file is modified or created

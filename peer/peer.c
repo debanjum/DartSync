@@ -18,6 +18,20 @@ file_t *filetable_create(){
     return ft;
 }
 
+void setNodeType(char *filename, int type, unsigned long size){
+    if (file_table){
+        Node *current = file_table->head;
+        while (current != NULL){
+            if (strcmp(current->name, filename) == 0) {
+                current->type = type;
+                current->size = size;
+                break;
+            }
+            current = current->pNext;
+        }
+    }
+}
+
 // ptp_listening thread keeps receiving data requests from other peers. It handles data requests by creating a P2P upload thread.
 // ptp_listening thread is started after the peer is registered.
 void* ptp_listening(void* arg){
@@ -246,9 +260,11 @@ void* ptp_download(void* arg){
         free(buffer);
     }
     
+    setNodeType(filename, FILE_DOWNLOAD, fileSize);
+
     fclose(fp);
     printf("ptp_download: successfully received file %s!\n", filename);
-
+    
     free(arg);
     
     // update file_table and send HANDSHAKE pkt to tracker
@@ -281,7 +297,7 @@ void add(download_arg_t *down) {
 
     // set up the node
     current = (Node *)calloc(1, sizeof(Node));
-    current->type = FILE_DOWNLOAD;
+    current->type = FILE_DOWNLOADING;
     current->size = down->size;
     strcpy(current->name,down->filename);
     current->timestamp = down->timestamp;
@@ -311,7 +327,7 @@ void modify(download_arg_t *down) {
     // modify the node's information
     current->size = down->size;
     current->timestamp = down->timestamp;
-    current->type = FILE_DOWNLOAD;
+    current->type = FILE_DOWNLOADING;
 
 }
 
@@ -443,8 +459,9 @@ void compareNode(Node *seekNode) {
         if (current->timestamp <= seekNode->timestamp) {
 
             // if we need to modify the file
-             if (seekNode->type != FILE_DELETE && current->timestamp < seekNode->timestamp) {
-
+            if (seekNode->size>0 && current->type != FILE_DOWNLOADING && seekNode->type != FILE_DELETE && (current->timestamp < seekNode->timestamp || (current->timestamp == seekNode->timestamp && current->size < seekNode->size))) {
+                
+                
                 download_arg_t* download_arg = (download_arg_t *)calloc(1, sizeof(download_arg_t));
 
                 // fill in the data for download_arg
@@ -492,8 +509,8 @@ void compareNode(Node *seekNode) {
         }
     }
 
-    // we have a new file that we need to download, add a new node in file table and set node type to FILE_DOWNLOADED
-    else {
+    // we have a new file that we need to download, add a new node in file table and set node type to FILE_DOWNLOADING
+    else if (seekNode->size>0) {
 
         download_arg_t* download_arg = (download_arg_t *)calloc(1, sizeof(download_arg_t));
 
