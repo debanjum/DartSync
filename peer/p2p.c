@@ -109,17 +109,18 @@ int upload_send(int conn, char* file_path, int pieceNum, unsigned long offset, u
         // compress the piece of data
         unsigned long int sourceLen = length;
         unsigned long int compLen = 0;
-        char *source = (char *)malloc(length);
-        strcpy(source, pkt->data);
+        char *source = calloc(sourceLen, sizeof(char));
+        strncpy(source, pkt->data, sourceLen);
 
         printf("compressing the data that will be sent\n");
 
         char *compPiece = compressString(source, sourceLen, &compLen);
-        memset(&pkt->data[0], 0, sizeof(pkt->data));
-        strcpy(pkt->data, compPiece);
+        memset(&pkt->data, 0, sizeof(pkt->data));
+        strncpy(pkt->data, compPiece, compLen);
 
         // first send the length of the compressed file piece
         if (send(conn, &compLen, sizeof(unsigned long int), 0) < 0) {
+            free(compPiece);
             perror("Failed to send the compressed file size");
             return -1;
         }
@@ -128,11 +129,20 @@ int upload_send(int conn, char* file_path, int pieceNum, unsigned long offset, u
         pkt->pieceNum = pieceNum;
         pkt->size = length;
         
-        if (ptp_sendpkt(conn, pkt) < 0){
+        /*if (ptp_sendpkt(conn, pkt) < 0){
+            return -1;
+        }*/
+
+        // send the compressed piece of data
+        if (send(conn, compPiece, compLen, 0) < 0) {
+            free(compPiece);
+            perror("Failed to send the compressed piece of data");
             return -1;
         }
+
+        free(compPiece);
     }
-    
+
     free(buffer);
     return 1;
 }
