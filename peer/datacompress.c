@@ -53,7 +53,7 @@ char* decompressString(char *source, unsigned long int sourceLen, unsigned long 
 	int code = uncompress((unsigned char*) dest, destLen, (unsigned char*) source, sourceLen);
 
 	// if the decompression was not successful, check to see which error occurred
-	if (code != Z_OK && code != -3) {
+	if (code != Z_OK) {
 		if (code == Z_MEM_ERROR) {
 			perror("Not enough memory");
 		}
