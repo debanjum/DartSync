@@ -23,9 +23,22 @@ int ptp_sendpkt(int conn, ptp_data_pkt_t *pkt){
 
 // Peer receives data packet from another peer
 int ptp_recvpkt(int conn, ptp_data_pkt_t *pkt){
+    /*
     if (recv(conn, pkt, sizeof(ptp_data_pkt_t), 0) == -1){
         perror("socket receive error!\n");
         return -1;
+    }
+    */
+    char buf[sizeof(ptp_data_pkt_t)];
+    char c;
+    int idx = 0;
+    while(recv(conn,&c,1,0)>0) {
+        buf[idx]=c;
+        if (idx == sizeof(ptp_data_pkt_t) - 1){
+            memmove(pkt, buf, sizeof(ptp_data_pkt_t));
+            break;
+        }
+        idx++;
     }
     printf("ptp_recvpkt: pkt size = %lu\n", pkt->size);
     return 1;
@@ -34,9 +47,22 @@ int ptp_recvpkt(int conn, ptp_data_pkt_t *pkt){
 // ptp_listening thread: parse data request from remote peer
 int recv_data_request(int conn, char* filename, int* pieceNum, unsigned long* offset, unsigned long* size){
     ptp_request_t request_pkt;
+    /*
     if (recv(conn, &request_pkt, sizeof(ptp_request_t), 0) == -1){
         perror("socket receive error!\n");
         return -1;
+    }
+    */
+    char buf[sizeof(ptp_request_t)];
+    char c;
+    int idx = 0;
+    while(recv(conn,&c,1,0)>0) {
+        buf[idx]=c;
+        if (idx == sizeof(ptp_request_t) - 1){
+            memmove(&request_pkt, buf, sizeof(ptp_request_t));
+            break;
+        }
+        idx++;
     }
     
     strcpy(filename, request_pkt.filename);
