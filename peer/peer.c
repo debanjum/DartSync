@@ -7,6 +7,9 @@
 //
 
 #include "peer.h"
+#include "datacompress.h"
+#include "../common/constant.h"
+#include <unistd.h>
 
 int ptp_listen_fd, tracker_conn;
 file_t *file_table;
@@ -146,6 +149,13 @@ void* piece_download(void* arg){
     memset(buffer, 0, size);
     
     for (int i = 0; i < pkt_count; i++){
+        // receive the length of the compressed file piece
+        unsigned long int compLen = 0;
+        if (recv(sockfd, &compLen, sizeof(unsigned long int), 0) < 0) {
+            perror("Failed to receive the length of the compressed file piece");
+            exit(1);
+        }
+
         //ptp_data_pkt_t *pkt = (ptp_data_pkt_t *)malloc(sizeof(ptp_data_pkt_t));
         ptp_data_pkt_t pkt;
         memset(&pkt, 0, sizeof(ptp_data_pkt_t));
@@ -155,6 +165,18 @@ void* piece_download(void* arg){
         printf("successfully received data pkt id = %d!\n", i);
         //printf("pkt->size = %lu\n", pkt.size);
         //printf("pkt->pieceNum = %d\n", pkt.pieceNum);
+
+        // decompress the file piece that was received
+        unsigned long int destLen = MAX_DATA_LEN;
+        char *source = (char *)malloc(sizeof(pkt.data));
+        strncpy(source, pkt.data, compLen);
+
+        printf("currently decompressing the compressed data\n");
+
+        char *decompString = decompressString(source, compLen, &destLen);
+        memset(&pkt.data[0], 0, sizeof(pkt.data));
+        strcpy(pkt.data, decompString);
+
         nanosleep((const struct timespec[]){{0, RECV_INTERVAL}}, NULL);
         memmove(&buffer[i * MAX_DATA_LEN], pkt.data, pkt.size);
         //free(pkt);
@@ -182,6 +204,42 @@ void* ptp_download(void* arg){
     int remainder_len;
     // divide one file into *peerNum* pieces
     int peerNum;    // total num of pieces
+
+    // search for temporary files
+    char path[256];
+    char find[256];
+    strcpy(path, readConfigFile("config.data"));
+    sprintf(find, "find %s -name \"%s_*\" > tmpfiles", path, filename);
+    system(find);
+
+    // attempt to open tmpfiles
+    FILE *temp = fopen("tmpfiles", "r");
+    char tempbuffer[256];
+    int filesize = 0;
+    int tempnum = 0;
+
+    // if the file exists, check if the size is greater than 0
+    if (temp != NULL) {
+        fseek(temp, 0, SEEK_END);
+        filesize = ftell(temp);
+
+        // if there are indeed temporary files, count the number of temporary files that exist
+        if (filesize != 0) {
+            while (fgets(tempbuffer, 256, temp)) {
+                tempnum++;
+            }
+
+            // set the number of peers we want to download from to tempnum
+            download_arg->peerNum = tempnum;
+
+            printf("Now resuming from partial download\n");
+            fflush(stdout);
+        }
+    }
+
+    fclose(temp);
+    system("rm tmpfiles");
+
     if (download_arg->peerNum == 1){
         peerNum = 1;
         pieceSize = fileSize;
@@ -207,17 +265,35 @@ void* ptp_download(void* arg){
     // download one file from multiple peers using multi-threading
     pthread_t tid[peerNum];
     for (int i = 0; i < peerNum; i++){
-        piece_download_arg_t *piece_arg = (piece_download_arg_t *)calloc(1, sizeof(piece_download_arg_t));
-        strcpy(piece_arg->filename, filename);
-        memmove(&piece_arg->peer_addr, &peer_addr_list[i], sizeof(struct sockaddr_in));
-        piece_arg->pieceNum = i;
-        piece_arg->offset = i * pieceSize;
-        piece_arg->size = (remainder_len > 0 && i == peerNum - 1)? remainder_len:pieceSize;
-        printf("pieceNum = %d\n", piece_arg->pieceNum);
-        printf("piece size = %lu\n", piece_arg->size);
-        printf("creating piece_download thread!\n");
-        // create a piece_download thread for downloading the i_th piece of the file
-        pthread_create(&tid[i], NULL, piece_download, (void*)(piece_arg));
+
+        char fname[FILE_NAME_LEN];
+        memset(fname, 0, FILE_NAME_LEN);
+        sprintf(fname, "%s.%s_%d", readConfigFile("config.data"), filename, i);
+
+        // get the length of the temporary file if it exists (used only for resuming downloads)
+        int curLength = 0;
+        FILE* checkTmp = fopen(fname, "r");
+        if (checkTmp != NULL){
+            fseek(checkTmp, 0, SEEK_END);
+            curLength = ftell(checkTmp);
+            fclose(checkTmp);
+        }
+
+        // only download if necessary (when resuming downloads, do not redownload a complete temporary file)
+        if ((i < peerNum - 1 && curLength < pieceSize) || (i == peerNum - 1 && curLength < pieceSize && remainder_len == 0) || 
+            (i == peerNum - 1 && curLength < remainder_len && remainder_len > 0)) {
+            piece_download_arg_t *piece_arg = (piece_download_arg_t *)calloc(1, sizeof(piece_download_arg_t));
+            strcpy(piece_arg->filename, filename);
+            memmove(&piece_arg->peer_addr, &peer_addr_list[i], sizeof(struct sockaddr_in));
+            piece_arg->pieceNum = i;
+            piece_arg->offset = i * pieceSize;
+            piece_arg->size = (remainder_len > 0 && i == peerNum - 1)? remainder_len:pieceSize;
+            printf("pieceNum = %d\n", piece_arg->pieceNum);
+            printf("piece size = %lu\n", piece_arg->size);
+            printf("creating piece_download thread!\n");
+            // create a piece_download thread for downloading the i_th piece of the file
+            pthread_create(&tid[i], NULL, piece_download, (void*)(piece_arg));
+        }
     }
     
     // wait for all piece_download threads to terminate
